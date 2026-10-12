@@ -1,0 +1,4 @@
+LIBRARY WorldVoiceSapi
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

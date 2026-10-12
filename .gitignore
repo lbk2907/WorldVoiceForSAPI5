@@ -1,0 +1,9 @@
+# Made by build.cmd and the setup
+/build/
+/Output/
+
+# Logs, editor and tool leftovers
+*.log
+__pycache__/
+.vs/
+*.user

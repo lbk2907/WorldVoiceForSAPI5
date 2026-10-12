@@ -1,0 +1,97 @@
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+1 RT_MANIFEST "WorldVoiceConfig.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Loh Boon Keat"
+            VALUE "FileDescription", "WorldVoice for SAPI 5 configuration"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "ProductName", "WorldVoice for SAPI 5"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+// A plain window (its own class, see wWinMain), so screen readers announce only the control in focus: the tab
+// bar on top and both tabs' controls directly in the window, shown and hidden by tab. Ids 1100-1199 belong to the
+// General tab, 1200-1299 to Voices. There is no Apply button: every change is saved at once and the voice uses
+// it from its next sentence.
+IDD_MAIN DIALOGEX 0, 0, 320, 304
+STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "WorldVoice for SAPI 5 - Configuration"
+CLASS "WorldVoiceConfigWnd"
+FONT 9, "Segoe UI"
+BEGIN
+    CONTROL         "", IDC_TAB, "SysTabControl32", WS_TABSTOP, 4, 4, 312, 14
+
+    // ---- General ----
+    LTEXT           "&Main language:", IDC_MAINLANG_L, 10, 30, 150, 8
+    COMBOBOX        IDC_MAINLANG, 162, 28, 148, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    // WorldVoice's wording. Each list holds only the languages of that script that have an installed voice, and
+    // is unavailable when there are none.
+    GROUPBOX        "Language detection", IDC_DETECTGROUP, 6, 46, 308, 118
+    LTEXT           "Language assumed for La&tin characters:", IDC_LATIN_L, 12, 60, 148, 8
+    COMBOBOX        IDC_LATIN, 162, 58, 144, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Language assumed for C&JK characters:", IDC_HAN_L, 12, 78, 148, 8
+    COMBOBOX        IDC_HAN, 162, 76, 144, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Language assumed for &Arabic characters:", IDC_ARABIC_L, 12, 96, 148, 8
+    COMBOBOX        IDC_ARABIC, 162, 94, 144, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Language assumed for C&yrillic characters:", IDC_CYRILLIC_L, 12, 114, 148, 8
+    COMBOBOX        IDC_CYRILLIC, 162, 112, 144, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Language assumed for Devana&gari characters:", IDC_DEVANAGARI_L, 12, 132, 148, 8
+    COMBOBOX        IDC_DEVANAGARI, 162, 130, 144, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "Ignore &numbers when detecting text language", IDC_NUMBERS, 12, 148, 294, 10
+
+    // ---- Voices ----
+    LTEXT           "&Languages and their voices:", IDC_LIST_L, 10, 28, 300, 8
+    CONTROL         "", IDC_LIST, WC_LISTVIEW, LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 10, 39, 300, 90
+    // The selected language's voice and adjustments, -10..10 (0 = as the speaking program asks). The sliders have
+    // TBS_DOWNISLEFT (0x0400, written as a number: rc does not see the CommCtrl.h define), so Up and Page Up raise
+    // the value.
+    GROUPBOX        "Voice settings", IDC_VOICEGROUP, 6, 134, 308, 78
+    LTEXT           "&Voice for the selected language:", IDC_VOICE_L, 12, 148, 120, 8
+    COMBOBOX        IDC_VOICE, 134, 146, 172, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Rate:", IDC_RATE_L, 12, 166, 58, 8
+    CONTROL         "", IDC_RATE, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 72, 163, 200, 14
+    LTEXT           "", IDC_RATE_V, 276, 166, 30, 8
+    LTEXT           "P&itch:", IDC_PITCH_L, 12, 182, 58, 8
+    CONTROL         "", IDC_PITCH, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 72, 179, 200, 14
+    LTEXT           "", IDC_PITCH_V, 276, 182, 30, 8
+    LTEXT           "V&olume:", IDC_VOLUME_L, 12, 198, 58, 8
+    CONTROL         "", IDC_VOLUME, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 72, 195, 200, 14
+    LTEXT           "", IDC_VOLUME_V, 276, 198, 30, 8
+    // Test, in this order: the box, the text, Play. Play reads the text with the selected language's voice and
+    // adjustments, or, with the box ticked, the way WorldVoice reads it (each language with its own voice).
+    GROUPBOX        "Test", IDC_TESTGROUP, 6, 216, 308, 48
+    AUTOCHECKBOX    "Test &all languages together, as WorldVoice reads them", IDC_TESTALL, 12, 228, 294, 10
+    LTEXT           "T&est text:", IDC_TESTTEXT_L, 12, 246, 56, 8
+    EDITTEXT        IDC_TESTTEXT, 70, 244, 184, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Play", IDC_PLAY, 258, 243, 48, 14
+
+    // ---- Log ----
+    GROUPBOX        "Debug log", IDC_GRP_LOG, 6, 24, 308, 92
+    AUTOCHECKBOX    "Write a debug &log", IDC_LOGON, 12, 38, 200, 10
+    LTEXT           "With the log on, WorldVoice notes what it does and when: how it splits each text by language, which voice reads each piece and how long it takes. It starts and stops at once, also in programs already using it. Turn it off when done.", IDC_LOGNOTE, 12, 52, 294, 26
+    LTEXT           "", IDC_LOGINFO, 12, 80, 294, 9
+    PUSHBUTTON      "&Open the log folder", IDC_LOGOPEN, 12, 94, 100, 14
+    PUSHBUTTON      "Cl&ear the log...", IDC_LOGCLEAR, 118, 94, 90, 14
+
+    LTEXT           "", IDC_STATUS, 10, 268, 300, 16
+    PUSHBUTTON      "Reset all to &default", IDC_RESET, 166, 286, 90, 14
+    PUSHBUTTON      "&Close", IDCANCEL, 260, 286, 50, 14
+END
