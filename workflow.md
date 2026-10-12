@@ -45,10 +45,11 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
 * **Files are LF** (user request, 2026-10-13: Windows' own tools all read LF nowadays, Notepad, the compiler and
   Inno Setup included).  `.gitattributes` keeps them LF on every machine (`* text=auto eol=lf`), whatever the
   machine's own Git settings.  The one exception is a Windows batch file (`.cmd`, `.bat`): Command Prompt can miss a
-  `call :label` in a batch file with LF endings, so `build.cmd` stays CRLF.  On Windows, Python's text mode writes
-  CRLF: a script that writes a file opens it with `newline='\n'` (as `tools\make_scripts.py` does), or with
-  `newline=''` to keep the endings it has.  Check `git diff --stat` before committing: it should show only the lines
-  you meant.
+  `call :label` in a batch file with LF endings, so `build.cmd` stays CRLF.  A file that must keep its endings, or
+  its bytes, gets its own line in `.gitattributes`, as the batch files and the DLLs and programs do.  On Windows,
+  Python's text mode writes CRLF: a script that writes a file opens it with `newline='\n'` (as
+  `tools\make_scripts.py` does), or with `newline=''` to keep the endings it has.  Check `git diff --stat` before
+  committing: it should show only the lines you meant.
 
 ## Things that break quietly
 
