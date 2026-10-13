@@ -158,11 +158,12 @@ private:
         cur.src.clear();
     }
 
-    // iter_number_speech_segments_mode, with _NUMBER_RE = [+-]?[0-9]+(?:\.[0-9]+)?
+    // iter_number_speech_segments_mode, with _NUMBER_RE = [+-]?[0-9]+(?:\.[0-9]+)?, without its spaces around a full
+    // stop next to a number ("2.54.2" read as "2.54 . 2", "192.168.1.1" as "192.168 . 1.1"; user request,
+    // 2026-10-13): the text between numbers goes as it is.
     void NumberMode(const Item& in, std::vector<Item>& out) {
         const std::wstring& t = in.text;
         size_t n = t.size(), pos = 0, i = 0;
-        bool previousWasNumber = false;
         Item cur = Start(in);
         while (i < n) {
             size_t j = i;
@@ -174,19 +175,11 @@ private:
                 j++;
                 while (j < n && IsAsciiDigit(t[j])) j++;
             }
-            if (start > pos) {
-                if (previousWasNumber && t[pos] == L'.') Space(cur, in, pos);
-                Put(cur, in, pos, start);
-                if (t[start - 1] == L'.') Space(cur, in, start);    // prefix.endswith(".")
-            }
+            if (start > pos) Put(cur, in, pos, start);
             TranslateNumber(cur, in, start, j, out);
             pos = i = j;
-            previousWasNumber = true;
         }
-        if (pos < n) {
-            if (previousWasNumber && t[pos] == L'.') Space(cur, in, pos);
-            Put(cur, in, pos, n);
-        }
+        if (pos < n) Put(cur, in, pos, n);
         Flush(cur, out);
     }
 

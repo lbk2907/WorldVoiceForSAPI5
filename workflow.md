@@ -26,8 +26,9 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   (`str.isdigit()`, `str.isspace()`), so run it with a Python whose Unicode version (`unicodedata.unidata_version`)
   is the one the add-on's NVDA runs on, and say which in the commit.
 * **Every departure is written down.**  What this voice adds or does its own way (the Cyrillic and Devanagari
-  settings, the 44100 Hz conversion, the trimmed silences, each language's rate, pitch and volume) is described in
-  `README.md` and `setup\README.txt`.  If it was asked for, say so: "(user request)".
+  settings, the 44100 Hz conversion, the trimmed silences, each language's rate, pitch and volume, the full stops
+  next to numbers left without the add-on's spaces) is described in `README.md` and `setup\README.txt`.  If it was
+  asked for, say so: "(user request)".
 
 ## Two READMEs
 

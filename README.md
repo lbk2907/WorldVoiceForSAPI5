@@ -123,9 +123,9 @@ are on the configuration program's [Numbers and punctuation tab](#numbers-and-pu
 
 **Number mode:**
 
-- **Value** (the default): numbers as the voice reads them. As in the add-on, a full stop next to a number is set apart
-  from it with a space, except the point of a decimal number: "1.2.3" is read as "1.2 . 3", "192.168.1.1" as
-  "192.168 . 1.1", "There are 5." as "There are 5 .", and "3.14" stays as it is.
+- **Value** (the default): numbers as they are written, for the voice to read its own way: "2.54.2" and
+  "192.168.1.1" stay as they are. (The add-on also sets a full stop next to a number apart with a space, so that
+  "2.54.2" is read as "2.54 . 2"; WorldVoice for SAPI 5 leaves that out, in every mode, by user request.)
 - **Number**: digit by digit, "12345" as "1 2 3 4 5".
 - **Pair**: two digits at a time from the left, "12345" as "12 34 5"; a sign goes with the first pair ("-1234" as
   "-12 34"), and a decimal number is read as a value. Between the pairs goes a space, or, with a pair wait factor, a
