@@ -42,8 +42,14 @@ static void Save() {
     SetString(L"ArabicLanguage", g_settings.arabicLanguage);
     SetString(L"CyrillicLanguage", g_settings.cyrillicLanguage);
     SetString(L"DevanagariLanguage", g_settings.devanagariLanguage);
-    DWORD numbers = g_settings.numbersFollowText ? 1 : 0;
-    RegSetKeyValueW(HKEY_CURRENT_USER, wv::kSettingsKey, L"NumbersFollowText", REG_DWORD, &numbers, sizeof(numbers));
+    auto setDword = [](const wchar_t* name, DWORD v) { RegSetKeyValueW(HKEY_CURRENT_USER, wv::kSettingsKey, name, REG_DWORD, &v, sizeof(v)); };
+    setDword(L"NumbersFollowText", g_settings.numbersFollowText ? 1 : 0);
+    SetString(L"NumberMode", g_settings.numberMode);
+    setDword(L"PairWaitFactor", (DWORD)g_settings.pairWaitFactor);
+    setDword(L"PunctuationPause", g_settings.punctuationPause ? 1 : 0);
+    setDword(L"PunctuationWaitFactor", (DWORD)g_settings.punctuationWaitFactor);
+    setDword(L"RemovePunctuation", g_settings.removePunctuation ? 1 : 0);
+    SetString(L"PunctuationCharacters", g_settings.punctuationCharacters);
     HKEY k;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, wv::kVoicesKey, 0, nullptr, 0, KEY_READ | KEY_WRITE, nullptr, &k, nullptr) != ERROR_SUCCESS) return;
     for (const std::wstring& lang : g_allLanguages) {
@@ -197,6 +203,48 @@ static ScriptChoice g_scripts[] = {
     { IDC_DEVANAGARI, IDC_DEVANAGARI_L, "Devanagari", &wv::Settings::devanagariLanguage, {} },
 };
 
+// ---- Numbers and punctuation tab ----
+
+// WorldVoice's number modes, in its order.
+static const wchar_t* const kNumberModes[] = { L"value", L"number", L"pair" };
+static const wchar_t* const kNumberModeNames[] = { L"Value", L"Number (digit by digit)", L"Pair (two digits at a time)" };
+
+// A wait factor as shown: its pause, 5 ms a step (at most 500 ms).
+static std::wstring WaitText(int factor) { return std::to_wstring((std::min)(factor * 5, 500)) + L" ms"; }
+
+// As in WorldVoice: the punctuation wait factor only with the pauses on, the characters with the pauses or the
+// removal on.
+static void EnablePunctuation(HWND d) {
+    bool pause = g_settings.punctuationPause, chars = pause || g_settings.removePunctuation;
+    for (int id : { IDC_PUNCTWAIT, IDC_PUNCTWAIT_L, IDC_PUNCTWAIT_V }) EnableWindow(GetDlgItem(d, id), pause);
+    for (int id : { IDC_PUNCTCHARS, IDC_PUNCTCHARS_L }) EnableWindow(GetDlgItem(d, id), chars);
+}
+
+static void FillNumbersAndPunctuation(HWND d) {
+    int mode = 0;
+    for (int i = 0; i < 3; i++) if (g_settings.numberMode == kNumberModes[i]) mode = i;
+    SendDlgItemMessageW(d, IDC_NUMMODE, CB_SETCURSEL, mode, 0);
+    SendDlgItemMessageW(d, IDC_PAIRWAIT, TBM_SETPOS, TRUE, g_settings.pairWaitFactor);
+    SetDlgItemTextW(d, IDC_PAIRWAIT_V, WaitText(g_settings.pairWaitFactor).c_str());
+    CheckDlgButton(d, IDC_PUNCTPAUSE, g_settings.punctuationPause ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(d, IDC_PUNCTREMOVE, g_settings.removePunctuation ? BST_CHECKED : BST_UNCHECKED);
+    SendDlgItemMessageW(d, IDC_PUNCTWAIT, TBM_SETPOS, TRUE, g_settings.punctuationWaitFactor);
+    SetDlgItemTextW(d, IDC_PUNCTWAIT_V, WaitText(g_settings.punctuationWaitFactor).c_str());
+    SetDlgItemTextW(d, IDC_PUNCTCHARS, g_settings.punctuationCharacters.c_str());
+    EnablePunctuation(d);
+}
+
+// A wait factor's slider moved: saved, and its pause shown beside it.
+static void OnWaitSlider(HWND d, HWND slider) {
+    int value = wv::ClampFactor((DWORD)(std::max)(0, (int)SendMessageW(slider, TBM_GETPOS, 0, 0)));
+    bool pair = GetDlgCtrlID(slider) == IDC_PAIRWAIT;
+    int& field = pair ? g_settings.pairWaitFactor : g_settings.punctuationWaitFactor;
+    if (field == value) return;
+    field = value;
+    Save();
+    SetDlgItemTextW(d, pair ? IDC_PAIRWAIT_V : IDC_PUNCTWAIT_V, WaitText(value).c_str());
+}
+
 static void Fill(HWND d) {
     g_filling = true;
     // Main language: the languages that have a voice and are not turned off.
@@ -221,6 +269,7 @@ static void Fill(HWND d) {
         EnableWindow(GetDlgItem(d, sc.labelId), !sc.languages.empty());
     }
     CheckDlgButton(d, IDC_NUMBERS, g_settings.numbersFollowText ? BST_CHECKED : BST_UNCHECKED);
+    FillNumbersAndPunctuation(d);
     g_filling = false;
 }
 
@@ -321,14 +370,17 @@ static void LogCommand(HWND d, int id) {
 
 static HWND g_tab;
 
-// The tabs' controls live directly in the window (ids 1100-1199, 1200-1299 and 1300-1399); a tab shows its own.
+// The tabs, in order, and the first of the ids their controls have (each has 100): the controls live directly in the
+// window, and a tab shows its own.
+static const wchar_t* const kPages[] = { L"General", L"Voices", L"Numbers and punctuation", L"Log" };
+static const int kPageIds[] = { 1100, 1200, 1400, 1300 };
+
 static void ShowPage(HWND d, int page) {
-    if (page == 2) ShowLog(d);          // the log's size as it is now
+    if (kPageIds[page] == 1300) ShowLog(d);          // the log's size as it is now
     for (HWND c = GetWindow(d, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
         int id = GetDlgCtrlID(c);
-        if (id >= 1100 && id < 1200) ShowWindow(c, page == 0 ? SW_SHOWNA : SW_HIDE);
-        else if (id >= 1200 && id < 1300) ShowWindow(c, page == 1 ? SW_SHOWNA : SW_HIDE);
-        else if (id >= 1300 && id < 1400) ShowWindow(c, page == 2 ? SW_SHOWNA : SW_HIDE);
+        for (int p = 0; p < ARRAYSIZE(kPageIds); p++)
+            if (id >= kPageIds[p] && id < kPageIds[p] + 100) ShowWindow(c, p == page ? SW_SHOWNA : SW_HIDE);
     }
 }
 
@@ -344,12 +396,10 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         g_tab = GetDlgItem(d, IDC_TAB);
         TCITEMW ti = {};
         ti.mask = TCIF_TEXT;
-        ti.pszText = const_cast<wchar_t*>(L"General");
-        TabCtrl_InsertItem(g_tab, 0, &ti);
-        ti.pszText = const_cast<wchar_t*>(L"Voices");
-        TabCtrl_InsertItem(g_tab, 1, &ti);
-        ti.pszText = const_cast<wchar_t*>(L"Log");
-        TabCtrl_InsertItem(g_tab, 2, &ti);
+        for (int p = 0; p < ARRAYSIZE(kPages); p++) {
+            ti.pszText = const_cast<wchar_t*>(kPages[p]);
+            TabCtrl_InsertItem(g_tab, p, &ti);
+        }
         HWND list = GetDlgItem(d, IDC_LIST);
         ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT);
         LVCOLUMNW col = {};
@@ -371,6 +421,13 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 10);
             SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 2);
         }
+        for (const wchar_t* name : kNumberModeNames) AddItem(d, IDC_NUMMODE, name);
+        for (int id : { IDC_PAIRWAIT, IDC_PUNCTWAIT }) {
+            SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, 0);
+            SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 100);
+            SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 10);
+        }
+        SendDlgItemMessageW(d, IDC_PUNCTCHARS, EM_LIMITTEXT, 200, 0);
         Fill(d);
         ShowPage(d, 0);
         if (g_voices.empty()) SetDlgItemTextW(d, IDC_STATUS, L"No SAPI 5 voices are installed.");
@@ -384,7 +441,11 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         return FALSE;
     }
     case WM_HSCROLL:
-        if (!g_filling && lp) OnSlider(d, (HWND)lp);
+        if (!g_filling && lp) {
+            int id = GetDlgCtrlID((HWND)lp);
+            if (id == IDC_PAIRWAIT || id == IDC_PUNCTWAIT) OnWaitSlider(d, (HWND)lp);
+            else OnSlider(d, (HWND)lp);
+        }
         return TRUE;
     case WM_NOTIFY: {
         const NMHDR* n = reinterpret_cast<const NMHDR*>(lp);
@@ -424,6 +485,29 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             g_settings.numbersFollowText = IsDlgButtonChecked(d, IDC_NUMBERS) == BST_CHECKED;
             Save();
             break;
+        case IDC_NUMMODE:
+            if (HIWORD(wp) == CBN_SELCHANGE) {
+                int item = (int)SendDlgItemMessageW(d, IDC_NUMMODE, CB_GETCURSEL, 0, 0);
+                if (item >= 0 && item < 3) { g_settings.numberMode = kNumberModes[item]; Save(); }
+            }
+            break;
+        case IDC_PUNCTPAUSE:
+        case IDC_PUNCTREMOVE:
+            g_settings.punctuationPause = IsDlgButtonChecked(d, IDC_PUNCTPAUSE) == BST_CHECKED;
+            g_settings.removePunctuation = IsDlgButtonChecked(d, IDC_PUNCTREMOVE) == BST_CHECKED;
+            Save();
+            EnablePunctuation(d);
+            break;
+        case IDC_PUNCTCHARS:
+            if (HIWORD(wp) == EN_CHANGE) {
+                int len = GetWindowTextLengthW(GetDlgItem(d, IDC_PUNCTCHARS));
+                std::wstring text(len + 1, L'\0');
+                GetDlgItemTextW(d, IDC_PUNCTCHARS, &text[0], len + 1);
+                text.resize(len);
+                g_settings.punctuationCharacters = text;
+                Save();
+            }
+            break;
         case IDC_PLAY:
             PlayTest(d);
             break;
@@ -433,7 +517,8 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             LogCommand(d, LOWORD(wp));
             break;
         case IDC_RESET:
-            // Every WorldVoice setting goes: voices, adjustments, languages, numbers (and the debug log switch).
+            // Every WorldVoice setting goes: voices, adjustments, languages, numbers, punctuation (and the debug log
+            // switch).
             if (MessageBoxW(d, L"Reset all WorldVoice settings to their defaults? This clears every voice choice and adjustment.", kTitle, MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES) break;
             RegDeleteTreeW(HKEY_CURRENT_USER, wv::kSettingsKey);
             g_settings = wv::Settings();

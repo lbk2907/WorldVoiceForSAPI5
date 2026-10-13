@@ -8,8 +8,16 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
 
 * **Split a text exactly as the add-on does.**  The language detection in `common\WorldVoice.h` is a rule-for-rule
   port of the add-on's `languageDetection` module, version 6.2 (`find_language_for_script`,
-  `_language_for_character`, `add_detected_language_commands` and `process_for_spelling`).  A text split differently
-  from the add-on is a bug, unless somebody asked for the difference.
+  `_language_for_character`, `add_detected_language_commands` and `process_for_spelling`).  The number mode and the
+  pauses at punctuation in `sapi\Pipeline.h` are the same kind of port of the add-on's speech pipeline
+  (`iter_number_speech_segments_mode`, `_translate_number` and `inject_punctuation_pause`), from its master branch
+  after 6.2, and run before the split, as the add-on runs them before its detection.  A text split or changed
+  differently from the add-on is a bug, unless somebody asked for the difference.
+* **SAPI's fragments are the add-on's speech sequence.**  `Pipeline.h` takes the text of fragments in a row with the
+  same state as one string (NVDA's SAPI 5 driver writes the strings between two commands as one text), a silence as a
+  `BreakCommand`, and a bookmark, or a change of state between two texts, as another command.  Keep that mapping when
+  porting more of the pipeline, and keep every piece of text pointing into the program's own text, so word positions
+  stay right.
 * **Work from the add-on's code, not from memory.**  Read the add-on's function while porting or changing its C++
   counterpart.  The add-on is at <https://github.com/tsengwoody/WorldVoice>, and on a computer with it installed in
   `%APPDATA%\nvda\addons\WorldVoice\synthDrivers\WorldVoice\languageDetection`.

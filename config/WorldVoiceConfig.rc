@@ -28,8 +28,8 @@ BEGIN
 END
 
 // A plain window (its own class, see wWinMain), so screen readers announce only the control in focus: the tab
-// bar on top and both tabs' controls directly in the window, shown and hidden by tab. Ids 1100-1199 belong to the
-// General tab, 1200-1299 to Voices. There is no Apply button: every change is saved at once and the voice uses
+// bar on top and every tab's controls directly in the window, shown and hidden by tab. Ids 1100-1199 belong to the
+// General tab, 1200-1299 to Voices, 1400-1499 to Numbers and punctuation, 1300-1399 to Log. There is no Apply button: every change is saved at once and the voice uses
 // it from its next sentence.
 IDD_MAIN DIALOGEX 0, 0, 320, 304
 STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
@@ -82,6 +82,24 @@ BEGIN
     LTEXT           "T&est text:", IDC_TESTTEXT_L, 12, 246, 56, 8
     EDITTEXT        IDC_TESTTEXT, 70, 244, 184, 12, ES_AUTOHSCROLL
     PUSHBUTTON      "&Play", IDC_PLAY, 258, 243, 48, 14
+
+    // ---- Numbers and punctuation ----
+    // WorldVoice's settings of the same names (its Speech Pipeline panel). The wait factors go from 0 to 100, 5 ms a
+    // step, at most 500 ms; the sliders have TBS_DOWNISLEFT, as above.
+    GROUPBOX        "Numbers", IDC_NUMGROUP, 6, 24, 308, 52
+    LTEXT           "Number &mode:", IDC_NUMMODE_L, 12, 38, 110, 8
+    COMBOBOX        IDC_NUMMODE, 124, 36, 182, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Pa&ir wait factor:", IDC_PAIRWAIT_L, 12, 57, 110, 8
+    CONTROL         "", IDC_PAIRWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 54, 150, 14
+    LTEXT           "", IDC_PAIRWAIT_V, 274, 57, 34, 8
+    GROUPBOX        "Punctuation", IDC_PUNCTGROUP, 6, 82, 308, 82
+    AUTOCHECKBOX    "Enable &punctuation pause control", IDC_PUNCTPAUSE, 12, 96, 294, 10
+    AUTOCHECKBOX    "&Remove configured punctuation at pause points", IDC_PUNCTREMOVE, 12, 110, 294, 10
+    LTEXT           "Punctuation &wait factor:", IDC_PUNCTWAIT_L, 12, 127, 110, 8
+    CONTROL         "", IDC_PUNCTWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 124, 150, 14
+    LTEXT           "", IDC_PUNCTWAIT_V, 274, 127, 34, 8
+    LTEXT           "Punctuation pause c&haracters:", IDC_PUNCTCHARS_L, 12, 146, 110, 8
+    EDITTEXT        IDC_PUNCTCHARS, 124, 144, 182, 12, ES_AUTOHSCROLL
 
     // ---- Log ----
     GROUPBOX        "Debug log", IDC_GRP_LOG, 6, 24, 308, 92

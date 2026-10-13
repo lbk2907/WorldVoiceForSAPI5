@@ -42,6 +42,22 @@
 #define IDC_TESTGROUP   1256
 #define IDC_VOICEGROUP  1257
 
+// Numbers and punctuation tab (1400-1499)
+#define IDC_NUMMODE     1400
+#define IDC_PAIRWAIT    1401
+#define IDC_PAIRWAIT_V  1402
+#define IDC_PUNCTPAUSE  1403
+#define IDC_PUNCTREMOVE 1404
+#define IDC_PUNCTWAIT   1405
+#define IDC_PUNCTWAIT_V 1406
+#define IDC_PUNCTCHARS  1407
+#define IDC_NUMMODE_L   1450
+#define IDC_PAIRWAIT_L  1451
+#define IDC_PUNCTWAIT_L 1452
+#define IDC_PUNCTCHARS_L 1453
+#define IDC_NUMGROUP    1454
+#define IDC_PUNCTGROUP  1455
+
 // Log tab (1300-1399)
 #define IDC_GRP_LOG     1300
 #define IDC_LOGON       1301

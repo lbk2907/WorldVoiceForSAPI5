@@ -14,6 +14,13 @@
 //                      everything (see VoiceMap).
 //   Adjustments\<language>  DWORDs Rate, Pitch, Volume, each -10..10, 0 = as the speaking program asks: rate and
 //                      pitch in SAPI's steps, added to the program's; volume 10% per step
+//   NumberMode         "value" (the default), "number" (digit by digit) or "pair" (two digits at a time): WorldVoice's
+//                      number mode
+//   PairWaitFactor     DWORD 0..100: in pair mode, a pause of 5 ms per step between the pairs; 0 (the default): a space
+//   PunctuationPause   DWORD 1 (the default): pauses at punctuation, PunctuationWaitFactor long; 0: none
+//   PunctuationWaitFactor  DWORD 0..100: 5 ms per step, at most 500 ms; 0 (the default): no pause
+//   RemovePunctuation  DWORD 1: the punctuation marks where a pause can go are left out of the text; 0 (the default)
+//   PunctuationCharacters  the marks those are (missing: WorldVoice's own, kPunctuationCharacters)
 //   Log                DWORD 1: the voice writes %TEMP%\WorldVoice.log
 #pragma once
 #define WIN32_LEAN_AND_MEAN
@@ -32,6 +39,9 @@ static const wchar_t* const kSettingsKey = L"SOFTWARE\\WorldVoice";
 static const wchar_t* const kVoicesKey = L"SOFTWARE\\WorldVoice\\Voices";
 static const wchar_t* const kAdjustmentsKey = L"SOFTWARE\\WorldVoice\\Adjustments";
 static const wchar_t* const kNoVoice = L"-";
+// WorldVoice's punctuation pause characters: Arabic comma, Arabic semicolon, comma, full stop, semicolon, colon,
+// exclamation mark, Arabic question mark, question mark, ellipsis.
+static const wchar_t* const kPunctuationCharacters = L"،؛,.;:!؟?…";
 // SAPI XML <context id="WorldVoiceTest:<language>">: the configuration program's test of one language's voice.
 static const wchar_t* const kTestContext = L"WorldVoiceTest:";
 
@@ -56,6 +66,7 @@ inline const char* ScriptOf(uint32_t cp) {
     return r ? kScriptNames[r->value] : nullptr;
 }
 inline bool IsDigit(uint32_t cp) { return FindRange(kDigits, ARRAYSIZE(kDigits), cp) != nullptr; }
+inline bool IsDecimal(uint32_t cp) { return FindRange(kDecimals, ARRAYSIZE(kDecimals), cp) != nullptr; }
 inline bool IsSpace(uint32_t cp) { return FindRange(kSpaces, ARRAYSIZE(kSpaces), cp) != nullptr; }
 
 // The code point at text[i], and how many UTF-16 units it takes.
@@ -112,11 +123,18 @@ inline std::vector<std::wstring> ScriptLanguageList(const char* script) {
 // Settings
 // ---------------------------------------------------------------------------
 
-inline std::wstring ReadString(HKEY root, const wchar_t* key, const wchar_t* name) {
+// A string value; false when it is not there (an empty one is there).
+inline bool ReadString(HKEY root, const wchar_t* key, const wchar_t* name, std::wstring& out) {
     wchar_t buf[1024];
     DWORD size = sizeof(buf);
-    if (RegGetValueW(root, key, name, RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS) return std::wstring();
-    return buf;
+    if (RegGetValueW(root, key, name, RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS) return false;
+    out = buf;
+    return true;
+}
+inline std::wstring ReadString(HKEY root, const wchar_t* key, const wchar_t* name) {
+    std::wstring v;
+    ReadString(root, key, name, v);
+    return v;
 }
 inline bool ReadDword(HKEY root, const wchar_t* key, const wchar_t* name, DWORD& out) {
     DWORD v = 0, size = sizeof(v);
@@ -131,6 +149,7 @@ struct Adjustment {
     bool None() const { return !rate && !pitch && !volume; }
 };
 inline int ClampAdjustment(int v) { return v < -10 ? -10 : (v > 10 ? 10 : v); }
+inline int ClampFactor(DWORD v) { return v > 100 ? 100 : (int)v; }   // a wait factor, 0..100
 
 struct Settings {
     std::wstring mainLanguage = L"en", latinLanguage = L"en", hanLanguage = L"zh", arabicLanguage = L"ar";
@@ -138,6 +157,17 @@ struct Settings {
     bool numbersFollowText = false;
     std::map<std::wstring, std::wstring> voices;     // language -> token id, or kNoVoice
     std::map<std::wstring, Adjustment> adjustments;  // language -> its adjustments
+    // WorldVoice's number mode and punctuation pauses (its pipeline settings of the same names)
+    std::wstring numberMode = L"value";              // number_mode
+    int pairWaitFactor = 0;                          // pair_wait_factor, 0..100
+    bool punctuationPause = true;                    // punctuation_pause_enabled
+    int punctuationWaitFactor = 0;                   // punctuation_wait_factor, 0..100
+    bool removePunctuation = false;                  // remove_punctuation_characters
+    std::wstring punctuationCharacters = kPunctuationCharacters;   // punctuation_pause_characters, as typed
+
+    // WorldVoice's scaled_punctuation_wait and scaled_pair_wait: 5 ms a step, at most 500 ms.
+    int PunctuationWaitMs() const { return (std::min)(punctuationWaitFactor * 5, 500); }
+    int PairWaitMs() const { return (std::min)(pairWaitFactor * 5, 500); }
 
     Adjustment AdjustmentFor(const std::wstring& lang) const {
         auto it = adjustments.find(PrimaryLanguage(lang));
@@ -155,6 +185,13 @@ struct Settings {
         str(L"DevanagariLanguage", devanagariLanguage);
         DWORD d = 0;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"NumbersFollowText", d)) numbersFollowText = d != 0;
+        std::wstring mode;
+        if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"value" || mode == L"number" || mode == L"pair")) numberMode = mode;
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PairWaitFactor", d)) pairWaitFactor = ClampFactor(d);
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationPause", d)) punctuationPause = d != 0;
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationWaitFactor", d)) punctuationWaitFactor = ClampFactor(d);
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"RemovePunctuation", d)) removePunctuation = d != 0;
+        ReadString(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationCharacters", punctuationCharacters);
         HKEY k;
         if (RegOpenKeyExW(HKEY_CURRENT_USER, kVoicesKey, 0, KEY_READ, &k) == ERROR_SUCCESS) {
             for (DWORD i = 0;; i++) {

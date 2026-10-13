@@ -1,9 +1,9 @@
 // WorldVoiceSapi.cpp - WorldVoice for SAPI 5: one SAPI 5 voice that reads each part of a text with the voice chosen
 // for its language, the way the WorldVoice NVDA add-on does it.
 //
-// Each Speak call is split by language with WorldVoice's detection (common\WorldVoice.h): the script of every
-// character decides, spaces and punctuation stay with the text around them, numbers go to the main language's
-// voice. Each piece is then spoken by its voice's own SAPI 5 engine, created from the voice's token and driven
+// Each Speak call first gets WorldVoice's number mode and punctuation pauses (Pipeline.h), then is split by language
+// with WorldVoice's detection (common\WorldVoice.h): the script of every character decides, spaces and punctuation
+// stay with the text around them, numbers go to the main language's voice. Each piece is then spoken by its voice's own SAPI 5 engine, created from the voice's token and driven
 // directly with a relay site: the audio goes on to the program in one format (44100 Hz, 16-bit mono), every voice
 // converted up to it with a clean filter; the events keep the original text positions, and an interrupt reaches
 // the engine at once.
@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 #include "../common/WorldVoice.h"
+#include "Pipeline.h"
 #include "Resampler.h"
 
 static HMODULE g_module = nullptr;
@@ -596,8 +597,13 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
         return v;
     };
 
+    // WorldVoice's number mode and punctuation pauses, before the language detection, as in the add-on.
+    wv::Pipeline pipeline(settings);
+    std::vector<SPVTEXTFRAG> filtered;
+    const SPVTEXTFRAG* text = frags;
+    if (pipeline.Apply(frags, filtered)) text = filtered.empty() ? nullptr : filtered.data();
     std::vector<Piece> pieces;
-    Split(detector, base, frags, pieces);
+    Split(detector, base, text, pieces);
     if (LogEnabled()) {
         std::string list;
         for (const Piece& p : pieces) {
@@ -640,7 +646,8 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
         if (LogEnabled()) {
             std::wstring said;
             for (const SPVTEXTFRAG& f : p.frags)
-                if (f.pTextStart && (f.State.eAction == SPVA_Speak || f.State.eAction == SPVA_SpellOut || f.State.eAction == SPVA_Pronounce))
+                if (f.State.eAction == SPVA_Silence) said += L"[" + std::to_wstring(f.State.SilenceMSecs) + L" ms]";
+                else if (f.pTextStart && (f.State.eAction == SPVA_Speak || f.State.eAction == SPVA_SpellOut || f.State.eAction == SPVA_Pronounce))
                     said.append(f.pTextStart, f.ulTextLen);
             Log("piece %zu (%s) \"%s\": %llu ms of audio, hr 0x%08lx", index + 1, Utf8(p.language).c_str(), Utf8(said).c_str(),
                 relay.OutBytes() * 500 / out.nSamplesPerSec, hr);
