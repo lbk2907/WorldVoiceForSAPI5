@@ -547,21 +547,25 @@ static LANGID LangIdFor(const std::vector<wv::VoiceInfo>& voices, const std::wst
     return (LANGID)LocaleNameToLCID(mainLocale, 0);
 }
 
-// The pause kept where one piece hands over to the next (its voice's own closing silence is cut to this): a
-// sentence's end 250 ms, a comma's 150 ms, and a switch inside a phrase ("1张") 80 ms.
+// The pause kept where one piece hands over to the next (its voice's own closing silence is cut to this): after the
+// piece's last text, a sentence's end 250 ms, a comma's 150 ms, and a switch inside a phrase ("1张") 80 ms; and any
+// silence asked for after that text (a <silence> tag, a punctuation pause) on top. Only text counts: a bookmark's
+// fragment holds the bookmark's name.
 static ULONG PauseAfter(const std::vector<SPVTEXTFRAG>& frags) {
+    ULONG asked = 0;
     for (size_t f = frags.size(); f-- > 0;) {
         const SPVTEXTFRAG& t = frags[f];
-        if (!t.pTextStart || !t.ulTextLen) continue;
+        if (t.State.eAction == SPVA_Silence) { asked += t.State.SilenceMSecs; continue; }
+        if ((t.State.eAction != SPVA_Speak && t.State.eAction != SPVA_SpellOut) || !t.pTextStart || !t.ulTextLen) continue;
         for (ULONG i = t.ulTextLen; i-- > 0;) {
             wchar_t c = t.pTextStart[i];
             if (iswspace(c)) continue;
-            if (wcschr(L".!?…。！？．", c)) return 250;
-            if (wcschr(L",;:，、；：", c)) return 150;
-            return 80;
+            if (wcschr(L".!?…。！？．", c)) return 250 + asked;
+            if (wcschr(L",;:，、；：", c)) return 150 + asked;
+            return 80 + asked;
         }
     }
-    return 80;
+    return 80 + asked;
 }
 
 STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* format, const SPVTEXTFRAG* frags, ISpTTSEngineSite* site) {
