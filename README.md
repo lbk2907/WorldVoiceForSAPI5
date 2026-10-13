@@ -60,9 +60,10 @@ Made entirely by vibe coding, with Claude Opus 5.5 at ultracode effort.
 
 ## Installing
 
-1. Get `WorldVoice for SAPI 5 Setup.exe`: from this repository's
-   [Releases page](https://github.com/lbk2907/WorldVoiceForSAPI5/releases) when a release is published there, or build
-   it yourself (see [Building](#building)).
+1. Get `WorldVoice for SAPI 5 Setup.exe`: the latest release's setup downloads straight from
+   <https://github.com/lbk2907/WorldVoiceForSAPI5/releases/latest/download/WorldVoice.for.SAPI.5.Setup.exe> (every
+   release is on the [Releases page](https://github.com/lbk2907/WorldVoiceForSAPI5/releases)), or build it yourself
+   (see [Building](#building)).
 2. Run it. It needs administrator rights. It offers a Start Menu shortcut and a desktop shortcut to the configuration
    program.
 
