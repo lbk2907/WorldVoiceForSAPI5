@@ -290,8 +290,9 @@ the README, unticked.
 - Windows 10 or 11, 64-bit.
 - [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) (2022 or later) with "Desktop development
   with C++".
-- [Inno Setup 7](https://jrsoftware.org/isdl.php), in its default folder (`C:\Program Files\Inno Setup 7`), for the
-  setup.
+- [Inno Setup 7](https://jrsoftware.org/isdl.php), in its default folder (`C:\Program Files\Inno Setup 7`, or
+  `C:\Program Files (x86)\Inno Setup 7`), for the setup. Without it, `build.cmd` still builds the voice and the
+  configuration program, and says that the setup was not made.
 - [Python 3](https://www.python.org/downloads/), only to make `common\ScriptData.h` again (see
   [The script table](#the-script-table)).
 

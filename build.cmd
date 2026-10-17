@@ -42,9 +42,11 @@ echo Built WorldVoiceConfig.exe
 exit /b 0
 
 :setup
-rem Inno Setup 7 in its default folder (64-bit Program Files, also when this runs from a 32-bit program)
+rem Inno Setup 7 in its default folder: the 64-bit Program Files (also when this runs from a 32-bit program), or the
+rem 32-bit one. Without it, the programs are built but not the setup.
 set "ISCC=%ProgramW6432%\Inno Setup 7\ISCC.exe"
-if not exist "%ISCC%" (echo Inno Setup 7 not found: %ISCC% & exit /b 1)
+if not exist "%ISCC%" set "ISCC=%ProgramFiles(x86)%\Inno Setup 7\ISCC.exe"
+if not exist "%ISCC%" (echo Inno Setup 7 not found: the programs are built, but not the setup. See README.md. & exit /b 1)
 "%ISCC%" /Q "%HERE%setup\worldvoice.iss" || exit /b 1
 echo Built Output\WorldVoice for SAPI 5 Setup.exe
 exit /b 0
