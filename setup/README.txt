@@ -153,6 +153,13 @@ Each piece goes to its voice marked with its language (the voice's own locale of
 Kingdom) for a British voice), so a voice that speaks several languages reads each piece in the right one.
 Word positions and bookmarks refer to the program's own text, so following the text as it is read works as with any
 voice. Interrupting reaches the voice reading at once.
+NVDA's SAPI 5 driver (2026.3) can let a bit of an interrupted speech through, heard as a click when arrow keys
+interrupt quickly, with any SAPI 5 voice (user report). It keeps the start of each speech back until it has 50 ms,
+and its cancel does not empty that, so a speech interrupted before then began the next one; and it takes sound
+again before the voice has been told to stop. So WorldVoice gives the program the first 60 ms of a speech in one
+piece (it plays that at once), the rest in pieces of 10 ms, and nothing once the speech is stopped; when the program
+takes none of a piece, as NVDA does while it cancels, nothing more goes until the stop comes (half a second at
+most). The sound itself is the same as before, byte for byte.
 
 
 Where the settings are kept

@@ -131,6 +131,72 @@ struct SubVoice {
 };
 
 // ---------------------------------------------------------------------------
+// The audio of one Speak call on its way to SAPI's site, from every voice that reads a piece of it.
+//
+// NVDA's SAPI 5 driver (2026.3, synthDrivers\sapi5) lets a bit of an interrupted speech through, heard as a click when
+// arrow keys interrupt quickly (user report, 2026-10-31; Microsoft's voices click there too). Two ways:
+// - At the start of a speech it keeps the audio back until it has 50 ms, and its cancel does not empty what it kept:
+//   a speech interrupted before then left its start behind, and the next one began with it, cut short. So the first
+//   60 ms of a speech go in one write, which it plays at once; a speech shorter than that goes whole at its end.
+// - It takes up audio again before the voice has been told to stop. So the audio goes in writes of 10 ms, none once
+//   the speech is stopped, and while the driver cancels it takes none of a write (it reports 0 bytes): then nothing
+//   more is written until the stop comes (half a second at most, once a speech).
+// ---------------------------------------------------------------------------
+
+class Output {
+public:
+    Output(ISpTTSEngineSite* site, DWORD rate) : m_site(site), m_rate(rate) {}
+
+    HRESULT Write(const int16_t* s, size_t n) {
+        if (!m_started) {
+            m_start.insert(m_start.end(), s, s + n);
+            if (m_start.size() < m_rate * 60 / 1000) return (m_site->GetActions() & SPVES_ABORT) ? E_ABORT : S_OK;
+            return WriteStart(false);
+        }
+        const size_t piece = m_rate / 100;
+        for (size_t at = 0; at < n; at += piece) {
+            if (m_site->GetActions() & SPVES_ABORT) return E_ABORT;
+            HRESULT hr = Pass(s + at, (std::min)(piece, n - at), true);
+            if (FAILED(hr)) return hr;
+        }
+        return S_OK;
+    }
+    // The end of the speech: a start shorter than 60 ms goes now (the driver plays it at the end of the speech)
+    HRESULT Finish() { return WriteStart(true); }
+
+private:
+    HRESULT WriteStart(bool end) {
+        m_started = true;
+        if (m_start.empty()) return S_OK;
+        std::vector<int16_t> start;
+        start.swap(m_start);
+        if (m_site->GetActions() & SPVES_ABORT) return E_ABORT;
+        return Pass(start.data(), start.size(), !end);
+    }
+    HRESULT Pass(const int16_t* s, size_t n, bool wait) {
+        ULONG asked = (ULONG)(n * 2), done = 0;
+        HRESULT hr = m_site->Write(s, asked, &done);
+        if (FAILED(hr) || done || !wait || m_waited) return hr;
+        m_waited = true;
+        ULONGLONG until = GetTickCount64() + 500;
+        while (GetTickCount64() < until) {
+            if (m_site->GetActions() & SPVES_ABORT) {
+                Log("speak: the program took none of the audio and stopped the speech; nothing more was written");
+                return E_ABORT;
+            }
+            Sleep(1);
+        }
+        Log("speak: the program took none of the audio, but did not stop the speech; it goes on");
+        return S_OK;
+    }
+
+    ISpTTSEngineSite* m_site;
+    DWORD m_rate;
+    std::vector<int16_t> m_start;      // the start of the speech, until it is 60 ms
+    bool m_started = false, m_waited = false;
+};
+
+// ---------------------------------------------------------------------------
 // The site a voice speaks into: its audio goes on to SAPI's site in WorldVoice's format, its events with their
 // audio positions moved onto WorldVoice's stream. Everything else is SAPI's site's answer, except the language's
 // adjustments: the rate is the program's plus the language's rate (SAPI's -10..10), and the volume is scaled by
@@ -146,9 +212,9 @@ struct SubVoice {
 class RelaySite : public ISpTTSEngineSite {
 public:
     // filter: the conversion from the voice's rate to WorldVoice's, null when they are the same.
-    RelaySite(ISpTTSEngineSite* real, ULONGLONG outBase, const WAVEFORMATEX& in, const WAVEFORMATEX& out,
+    RelaySite(ISpTTSEngineSite* real, Output& output, ULONGLONG outBase, const WAVEFORMATEX& in, const WAVEFORMATEX& out,
               std::shared_ptr<const wv::ResampleFilter> filter, const wv::Adjustment& adjust)
-        : m_real(real), m_base(outBase), m_inFull(&in), m_in(in), m_outFormat(out), m_leadKeep(out.nSamplesPerSec * 20 / 1000),
+        : m_real(real), m_output(output), m_base(outBase), m_inFull(&in), m_in(in), m_outFormat(out), m_leadKeep(out.nSamplesPerSec * 20 / 1000),
           m_rateAdjust(adjust.rate), m_gain(1.0 + adjust.volume / 10.0) {
         if (filter) m_resampler.reset(new wv::Resampler(std::move(filter)));
     }
@@ -308,8 +374,7 @@ private:
 
     HRESULT WriteOut(const int16_t* s, size_t n) {
         if (!n) return S_OK;
-        ULONG done = 0;
-        HRESULT hr = m_real->Write(s, (ULONG)(n * 2), &done);
+        HRESULT hr = m_output.Write(s, n);
         m_written += n;
         return hr;
     }
@@ -346,6 +411,7 @@ private:
     }
 
     ISpTTSEngineSite* m_real;
+    Output& m_output;
     ULONGLONG m_base, m_drained = 0;
     const WAVEFORMATEX* m_inFull;                                  // with any extension (cbSize), for the converter
     WAVEFORMATEX m_in, m_outFormat;
@@ -615,6 +681,7 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
     }
 
     ULONGLONG outBytes = 0;
+    Output output(site, out.nSamplesPerSec);
     for (size_t index = 0; index < pieces.size(); index++) {
         Piece& p = pieces[index];
         if (site->GetActions() & SPVES_ABORT) break;
@@ -636,7 +703,7 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
             }
         if (!SameFormat(*in, out))
             Log("voice %s speaks %lu Hz, %u bit, %u channel(s): converted", Utf8(v->id).c_str(), in->nSamplesPerSec, in->wBitsPerSample, in->nChannels);
-        RelaySite relay(site, outBytes, *in, out, FilterFrom(in->nSamplesPerSec), adjust);
+        RelaySite relay(site, output, outBytes, *in, out, FilterFrom(in->nSamplesPerSec), adjust);
         HRESULT hr = relay.Init();
         if (FAILED(hr)) { Log("converter setup failed 0x%08lx", hr); continue; }
         hr = v->engine->Speak(flags, fmtId, in, p.frags.data(), &relay);
@@ -653,6 +720,7 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
                 relay.OutBytes() * 500 / out.nSamplesPerSec, hr);
         }
     }
+    if (!(site->GetActions() & SPVES_ABORT)) output.Finish();
     if (LogEnabled()) Log("speak: done in %llu ms%s", GetTickCount64() - start, (site->GetActions() & SPVES_ABORT) ? " (interrupted)" : "");
     return S_OK;
 }
