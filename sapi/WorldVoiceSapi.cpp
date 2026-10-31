@@ -4,8 +4,8 @@
 // Each Speak call first gets WorldVoice's number mode and punctuation pauses (Pipeline.h), then is split by language
 // with WorldVoice's detection (common\WorldVoice.h): the script of every character decides, spaces and punctuation
 // stay with the text around them, numbers go to the main language's voice. Each piece is then spoken by its voice's own SAPI 5 engine, created from the voice's token and driven
-// directly with a relay site: the audio goes on to the program in one format (44100 Hz, 16-bit mono), every voice
-// converted up to it with a clean filter; the events keep the original text positions, and an interrupt reaches
+// directly with a relay site: the audio goes on to the program in one format (16-bit mono, at the highest rate of the
+// voices chosen), every voice converted up to it with a clean filter; the events keep the original text positions, and an interrupt reaches
 // the engine at once.
 //
 // The voices come from HKLM and HKCU\SOFTWARE\Microsoft\Speech\Voices\Tokens, as registered for the program's own
@@ -78,14 +78,17 @@ static std::string Utf8(const std::wstring& w) {
 // Audio format
 // ---------------------------------------------------------------------------
 
-// WorldVoice speaks in 44100 Hz 16-bit mono, above every voice's rate (Eloquence goes up to 32 kHz), so no voice
-// loses anything; each is converted up with WorldVoice's own filter (Resampler.h), which leaves it as it sounds on
-// its own. 44100 is also 4 x 11025 and 2 x 22050, the rates of Eloquence and the Cerence voices.
+// WorldVoice speaks in 16-bit mono at the highest rate of the voices chosen in it, settled when a program loads it
+// (OutRate), so no voice loses anything: the others are converted up with WorldVoice's own filter (Resampler.h),
+// which leaves each as it sounds on its own. It was always 44100 Hz until 31 October 2026; but NVDA's SAPI 5 driver
+// stops its player in the middle of what it holds at every interrupt, and that cut clicked in 44100 Hz sound made
+// from Eloquence's 11025 Hz, where Eloquence on its own, at 11025 Hz, does not click (user report). At its own rate a
+// voice reaches the program exactly as it would without WorldVoice. 44100 Hz is what it gives when no voice loads.
 static WAVEFORMATEX Pcm16Mono(DWORD rate) {
     WAVEFORMATEX w = { WAVE_FORMAT_PCM, 1, rate, rate * 2, 2, 16, 0 };
     return w;
 }
-static const DWORD kOutRate = 44100;
+static const DWORD kDefaultRate = 44100;
 static bool SameFormat(const WAVEFORMATEX& a, const WAVEFORMATEX& b) {
     return a.wFormatTag == b.wFormatTag && a.nChannels == b.nChannels && a.nSamplesPerSec == b.nSamplesPerSec && a.wBitsPerSample == b.wBitsPerSample;
 }
@@ -479,13 +482,13 @@ public:
         return m_token ? S_OK : S_FALSE;
     }
 
-    // Always WorldVoice's one format (see Pcm16Mono): programs open their audio player once, when they load the
-    // voice (NVDA does), so the format must not change with the voices chosen.
+    // Always the one format settled when the program first asks (see Pcm16Mono): programs open their audio player
+    // once, when they load the voice (NVDA does), so the format must not change while it is loaded.
     STDMETHODIMP GetOutputFormat(const GUID*, const WAVEFORMATEX*, GUID* fmtId, WAVEFORMATEX** wfx) override {
         if (!fmtId || !wfx) return E_POINTER;
         WAVEFORMATEX* out = (WAVEFORMATEX*)CoTaskMemAlloc(sizeof(WAVEFORMATEX));
         if (!out) return E_OUTOFMEMORY;
-        *out = Pcm16Mono(kOutRate);
+        *out = Pcm16Mono(OutRate());
         *fmtId = SPDFID_WaveFormatEx;
         *wfx = out;
         return S_OK;
@@ -497,6 +500,7 @@ private:
     struct Piece { std::wstring language; std::vector<SPVTEXTFRAG> frags; };
 
     void Refresh(wv::Settings& settings, wv::VoiceMap& map);
+    DWORD OutRate();
     SubVoice* Voice(const std::wstring& id);
     std::shared_ptr<const wv::ResampleFilter> FilterFrom(DWORD rate);
     void Split(const wv::Detector& detector, const std::wstring& base, const SPVTEXTFRAG* frags, std::vector<Piece>& pieces);
@@ -508,13 +512,40 @@ private:
     std::vector<wv::VoiceInfo> m_voices;
     ULONGLONG m_voicesTime = 0;
     std::map<DWORD, std::shared_ptr<const wv::ResampleFilter>> m_filters;   // by the voice's rate, made once
+    std::atomic<DWORD> m_outRate{ 0 };                            // WorldVoice's rate, once settled (OutRate)
+    SRWLOCK m_rateLock = SRWLOCK_INIT;
 };
+
+// WorldVoice's rate, settled the first time it is needed (when a program loads the voice and asks its format): the
+// highest rate the chosen voices speak in when asked for 44100 Hz (with none chosen, the voice that reads
+// everything). It stays while the program has the voice loaded: choosing a voice with a higher rate, or changing a
+// voice's own rate, is heard as such once the program loads WorldVoice again (as a voice's own rate setting is).
+DWORD WorldVoiceEngine::OutRate() {
+    if (DWORD rate = m_outRate) return rate;
+    AcquireSRWLockExclusive(&m_rateLock);
+    if (!m_outRate) {
+        wv::Settings settings;
+        wv::VoiceMap map;
+        Refresh(settings, map);
+        WAVEFORMATEX ask = Pcm16Mono(kDefaultRate);
+        DWORD rate = 0;
+        for (const std::wstring& lang : map.Languages()) {
+            SubVoice* v = Voice(map.VoiceFor(lang));
+            if (v && SUCCEEDED(v->Format(&SPDFID_WaveFormatEx, &ask)) && v->wfx->nSamplesPerSec > rate) rate = v->wfx->nSamplesPerSec;
+        }
+        m_outRate = rate ? rate : kDefaultRate;
+        Log("format: %lu Hz 16-bit mono, the highest rate of the voices chosen", (unsigned long)m_outRate);
+    }
+    ReleaseSRWLockExclusive(&m_rateLock);
+    return m_outRate;
+}
 
 // The conversion from a voice's rate to WorldVoice's (null when there is none to do).
 std::shared_ptr<const wv::ResampleFilter> WorldVoiceEngine::FilterFrom(DWORD rate) {
-    if (!rate || rate == kOutRate) return nullptr;
+    DWORD out = OutRate();
+    if (!rate || rate == out) return nullptr;
     std::shared_ptr<const wv::ResampleFilter>& f = m_filters[rate];
-    if (!f) f = std::make_shared<const wv::ResampleFilter>(rate, kOutRate);
+    if (!f) f = std::make_shared<const wv::ResampleFilter>(rate, out);
     return f;
 }
 
@@ -646,9 +677,9 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
     std::wstring base = map.MainLanguage();
     if (base.empty()) { Log("speak: no voices installed"); return S_OK; }
     // The format SAPI asks for is the one GetOutputFormat gave.
-    WAVEFORMATEX out = Pcm16Mono(kOutRate);
+    WAVEFORMATEX out = Pcm16Mono(OutRate());
     if (format && !SameFormat(*format, out))
-        Log("speak: asked for %lu Hz, %u bit, %u channel(s); writing %lu Hz 16-bit mono", format->nSamplesPerSec, format->wBitsPerSample, format->nChannels, kOutRate);
+        Log("speak: asked for %lu Hz, %u bit, %u channel(s); writing %lu Hz 16-bit mono", format->nSamplesPerSec, format->wBitsPerSample, format->nChannels, out.nSamplesPerSec);
 
     // A piece's voice, and the format it speaks in when asked for WorldVoice's (a copy, with any extension). Null
     // when it cannot speak.

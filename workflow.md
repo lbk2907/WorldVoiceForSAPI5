@@ -26,7 +26,8 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   (`str.isdigit()`, `str.isspace()`), so run it with a Python whose Unicode version (`unicodedata.unidata_version`)
   is the one the add-on's NVDA runs on, and say which in the commit.
 * **Every departure is written down.**  What this voice adds or does its own way (the Cyrillic and Devanagari
-  settings, the 44100 Hz conversion, the trimmed silences, each language's rate, pitch and volume, the full stops
+  settings, the one sound format at the chosen voices' highest rate, the trimmed silences, each language's rate,
+  pitch and volume, the full stops
   next to numbers left without the add-on's spaces) is described in `README.md` and `setup\README.txt`.  If it was
   asked for, say so: "(user request)".
 
@@ -74,8 +75,11 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   `HKLM32` in the setup).  The configuration program lists the voices registered for 64-bit programs; a 32-bit
   program looks in the 32-bit registration, and a chosen voice missing there is replaced by the main language's
   voice.  Test both.
-* **The sound format is fixed.**  WorldVoice always gives 44100 Hz, 16-bit mono, because programs open their sound
-  player once, when they load the voice.  Do not make it follow the voice that is reading.
+* **The sound format is fixed while the voice is loaded.**  WorldVoice gives 16-bit mono at the highest rate of the
+  voices chosen, settled the first time the program asks (`OutRate`), because programs open their sound player once,
+  when they load the voice.  Do not make it follow the voice that is reading, and never convert a voice down: the
+  user wants every voice at its own quality (user request, 2026-10-31; before that it was always 44100 Hz, which
+  made NVDA's cut at an interrupt click with Eloquence at 11025 Hz).
 
 ## Testing
 

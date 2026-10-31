@@ -139,12 +139,17 @@ language's voice.
 
 How it sounds
 
-WorldVoice always gives the program 44100 Hz, 16-bit mono sound, whatever the voices speak in: programs open their
-sound player once, when they load the voice, so the format cannot change with the voice reading. 44100 Hz is above
-the rates SAPI 5 voices speak in (11025 to 32000 Hz for those tried), so nothing is lost; each voice's sound is
-converted to it with WorldVoice's own filter, which adds nothing audible (what it leaves is at
-least 97 dB down, the limit of 16-bit sound; Windows' own converter leaves mirror images of the sound only 16 to
-39 dB down).
+WorldVoice gives the program one format, 16-bit mono at the highest rate of the voices chosen in it (with none
+chosen, the rate of the voice that reads everything), settled when the program loads WorldVoice: programs open
+their sound player once, when they load the voice, so the format cannot change with the voice reading. A voice
+chosen later with a higher rate, or a voice's own rate changed, takes effect when the program loads WorldVoice
+again (in NVDA, choose another synthesizer and then SAPI 5 again, or restart NVDA), as a voice's own rate setting
+does. No voice is ever converted down, so nothing is lost, and a voice at that rate reaches the program exactly as
+it would on its own; the others are converted up with WorldVoice's own filter, which adds nothing audible (what it
+leaves is at least 97 dB down, the limit of 16-bit sound; Windows' own converter leaves mirror images of the sound
+only 16 to 39 dB down). Until 31 October 2026 the format was always 44100 Hz: in NVDA, which cuts its player off
+in the middle of a sound at every interrupt, that cut clicked in Eloquence's 11025 Hz sound made 44100 Hz, where
+Eloquence on its own did not (user report). If no voice can be loaded, WorldVoice gives 44100 Hz.
 Voices begin and end what they say with silence, as if each piece were a whole text. So that switching languages
 does not pause, the silence at the start of a piece is cut to 20 ms, and at its end, when another piece follows, to a
 natural pause: 250 ms after the end of a sentence, 150 ms after a comma, colon or semicolon, 80 ms otherwise, with
