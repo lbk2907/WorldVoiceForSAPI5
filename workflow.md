@@ -29,10 +29,11 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   (`str.isdecimal()`, `str.isspace()`, `\w`), so run it with the Python the add-on's NVDA runs on (NVDA 2026.3:
   Python 3.13, Unicode 15.1), and say which in the commit.
 * **Every departure is written down.**  What this voice adds or does its own way (the Cyrillic and Devanagari
-  settings, the one sound format at the chosen voices' highest rate, the trimmed silences, each language's rate,
-  pitch and volume, the full stops next to numbers left without the add-on's spaces, the symbols in a number left
-  unnamed, the spaces kept where the pauses between numbers go in) is described in `README.md` and
-  `setup\README.txt`.  If it was asked for, say so: "(user request)".
+  settings, Chinese as the CJK characters' default language where the add-on has Japanese, the one sound format at
+  the chosen voices' highest rate, the trimmed silences, each language's rate, pitch and volume, the full stops next
+  to numbers left without the add-on's spaces, the symbols in a number left unnamed, the spaces kept where the pauses
+  between numbers go in) is described in `README.md` and `setup\README.txt`.  If it was asked for, say so: "(user
+  request)".
 
 ## Two READMEs
 

@@ -201,7 +201,8 @@ It has four tabs. Ctrl+Tab and Ctrl+Shift+Tab move between them.
   script's text when the text around it is not already in one of the script's languages (see
   [How WorldVoice splits a text](#how-worldvoice-splits-a-text)). Each list holds the script's languages that have a
   voice chosen, and is unavailable when there are none. The WorldVoice add-on offers Latin, CJK and Arabic; Cyrillic
-  and Devanagari are added here, for the same reason.
+  and Devanagari are added here, for the same reason. CJK characters are Chinese unless you choose otherwise, where
+  the add-on assumes Japanese (user request).
 - **Number language**: the language numbers are read in: "Follow surrounding text language" (the default), "Follow
   main language", or one of the languages that have a voice (see
   [How WorldVoice splits a text](#how-worldvoice-splits-a-text)). It replaces WorldVoice's earlier "Ignore numbers

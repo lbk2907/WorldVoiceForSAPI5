@@ -128,7 +128,8 @@ General tab
         Language assumed for Latin, CJK, Arabic, Cyrillic and Devanagari characters: the language for that script's
         text when the text around it is not already in one of the script's languages (see above). Each list holds the
         script's languages that have a voice chosen, and is unavailable when there are none. The WorldVoice add-on
-        offers Latin, CJK and Arabic; Cyrillic and Devanagari are added here, for the same reason.
+        offers Latin, CJK and Arabic; Cyrillic and Devanagari are added here, for the same reason. CJK characters
+        are Chinese unless you choose otherwise, where the add-on assumes Japanese (user request).
         Number language: the language numbers are read in: "Follow surrounding text language" (the default), "Follow
         main language", or one of the languages that have a voice (see above). It replaces WorldVoice's earlier
         "Ignore numbers when detecting text language", as in the add-on's version 7.0; the earlier setting is not
