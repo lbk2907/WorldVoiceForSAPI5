@@ -10,7 +10,8 @@
 #define IDC_HAN         1101
 #define IDC_LATIN       1102
 #define IDC_ARABIC      1103
-#define IDC_NUMBERS     1104
+#define IDC_NUMLANG     1104
+#define IDC_NUMLANG_L   1158
 #define IDC_CYRILLIC    1107
 #define IDC_DEVANAGARI  1108
 #define IDC_CYRILLIC_L  1155

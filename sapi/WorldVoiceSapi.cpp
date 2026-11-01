@@ -601,33 +601,47 @@ void WorldVoiceEngine::Split(const wv::Detector& detector, const std::wstring& b
         if (category && wcsncmp(category, wv::kTestContext, wcslen(wv::kTestContext)) == 0) { add(category + wcslen(wv::kTestContext), *f); continue; }
         bool spell = f->State.eAction == SPVA_SpellOut;
         std::wstring spellCurrent = current;
-        size_t runStart = 0, units = 1;
-        std::wstring runLang = spell ? spellCurrent : temporary;
-        for (size_t i = 0; i < f->ulTextLen; i += units) {
+        std::wstring& tracked = spell ? spellCurrent : temporary;     // the detection's language
+        std::wstring runLang = tracked;                                // the language of the run being gathered
+        size_t runStart = 0;
+        auto part = [&](size_t a, size_t b) {
+            SPVTEXTFRAG p = *f;
+            p.pTextStart = f->pTextStart + a;
+            p.ulTextLen = (ULONG)(b - a);
+            p.ulTextSrcOffset = f->ulTextSrcOffset + (ULONG)a;
+            add(runLang, p);
+        };
+        // From at on the text is in lang: the run before ends there when that is another language.
+        auto cut = [&](size_t at, const std::wstring& lang) {
+            if (wv::PrimaryLanguage(lang) == wv::PrimaryLanguage(runLang)) return;
+            if (at > runStart) part(runStart, at);
+            runStart = at;
+            runLang = lang;
+        };
+        // The number language (the add-on's detect_with_number_language), unless numbers follow the text around them:
+        // detection sees each number wrapped in it, then in the language in force again, so the text after a number
+        // is detected from the language in force. The number is read in it only where that changes the voice: the
+        // add-on drops a wrapper that does not, and the number stays with the text before it.
+        std::wstring numberLang = spell ? std::wstring() : detector.NumberLanguageAt(current);
+        std::vector<std::pair<size_t, size_t>> numbers;
+        if (!numberLang.empty()) numbers = wv::NumbersForLanguage(f->pTextStart, f->ulTextLen);
+        size_t nextNumber = 0;
+        for (size_t i = 0; i < f->ulTextLen;) {
+            if (nextNumber < numbers.size() && i == numbers[nextNumber].first) {
+                cut(i, detector.SameVoice(numberLang, runLang) ? runLang : numberLang);
+                tracked = current;
+                i = numbers[nextNumber++].second;
+                continue;
+            }
+            size_t units = 1;
             uint32_t cp = wv::CodePointAt(f->pTextStart, f->ulTextLen, i, &units);
             std::wstring target = spell ? detector.LanguageForSpelling(cp, spellCurrent, current)
                                         : detector.LanguageForCharacter(cp, temporary, current);
-            std::wstring& tracked = spell ? spellCurrent : temporary;
-            if (wv::PrimaryLanguage(target) != wv::PrimaryLanguage(tracked)) {
-                if (i > runStart) {
-                    SPVTEXTFRAG part = *f;
-                    part.pTextStart = f->pTextStart + runStart;
-                    part.ulTextLen = (ULONG)(i - runStart);
-                    part.ulTextSrcOffset = f->ulTextSrcOffset + (ULONG)runStart;
-                    add(runLang, part);
-                }
-                runStart = i;
-                tracked = target;
-            }
-            runLang = tracked;
+            if (wv::PrimaryLanguage(target) != wv::PrimaryLanguage(tracked)) tracked = target;
+            cut(i, tracked);
+            i += units;
         }
-        if (f->ulTextLen > runStart) {
-            SPVTEXTFRAG part = *f;
-            part.pTextStart = f->pTextStart + runStart;
-            part.ulTextLen = (ULONG)(f->ulTextLen - runStart);
-            part.ulTextSrcOffset = f->ulTextSrcOffset + (ULONG)runStart;
-            add(runLang, part);
-        }
+        if (f->ulTextLen > runStart) part(runStart, f->ulTextLen);
     }
 }
 

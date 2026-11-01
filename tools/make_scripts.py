@@ -65,7 +65,6 @@ def main():
     lines += ["};", ""]
     word = re.compile(r"\w")
     tables = (
-        ("kDigits", str.isdigit, "Python's str.isdigit() is true"),
         ("kDecimals", str.isdecimal, "Python's str.isdecimal() is true (\\d)"),
         ("kSpaces", str.isspace, "Python's str.isspace() is true"),
         ("kWordChars", lambda c: bool(word.match(c)), "\\w matches in Python (a word character)"),

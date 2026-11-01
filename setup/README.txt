@@ -35,19 +35,27 @@ Each character's script (its writing system) decides its language:
     Thai, Greek to Greek, Hebrew to Hebrew, and so on for Armenian, Bengali, Bopomofo (Chinese), Georgian, Gujarati,
     Gurmukhi (Punjabi), Kannada, Khmer, Lao, Malayalam, Mongolian, Myanmar, Oriya, Sinhala, Tamil, Telugu and Tibetan.
     A script that several languages share (Latin, Cyrillic, Arabic, Devanagari, and the Chinese characters that
-    Chinese, Japanese and Korean all use): while the text around it is already in one of that script's languages, it
-    stays in that language (kanji in Japanese text are read in Japanese). Otherwise it goes to the language chosen for
-    that script on the General tab, when that language has a voice; else to the first of the script's languages that
-    has one.
+    Chinese, Japanese and Korean all use): while the text around it is already in one of that script's languages that
+    has a voice, it stays in that language (kanji in Japanese text are read in Japanese). Otherwise it goes to the
+    main language (or the program's marked one) when that is one of the script's languages with a voice; else to the
+    language chosen for that script on the General tab, when that language has a voice; else to the first of the
+    script's languages that has one.
     A language with no voice chosen is never switched to: its text stays with the language around it.
 Spaces, punctuation and symbols stay with the text around them.
-Numbers are read in the main language. With "Ignore numbers when detecting text language" ticked, they are read in
-the language of the text around them instead.
+Numbers follow the Number language setting. With "Follow surrounding text language" (the default) a number is read in
+the language of the text around it. With "Follow main language" it is read in the main language (or the program's
+marked one), and with a language chosen, in that language. A number is its digits, of any script (also full-width
+digits such as "１２" and Arabic-Indic ones such as "١٢"), with any punctuation and symbols of Latin-1 between them:
+"12,345", "5-3", "12:30" and "2×3" are one number each. A sign right after a letter or digit stays with the word, as
+the hyphen in "COVID-19"; after a space it belongs to the number, as in "-3". A number goes to another voice only
+where its language has a voice of its own: one read by the same voice as the text before it stays with that text.
+After a number the detection starts again from the main (or marked) language.
 Text the program marks with a language (NVDA's automatic language switching, a <lang> tag in SAPI's XML) takes that
-language in place of the main language, for itself and its numbers, and the detection carries on from it. When that
-language has no voice chosen, the main language's voice reads it.
-Spelled text (character by character) goes the same way, one character at a time; spaces and digits go to the main
-language (or the program's marked one).
+language in place of the main language, and the detection carries on from it. When that language has no voice
+chosen, the main language's voice reads it.
+Spelled text (character by character) goes the same way, one character at a time; spaces go to the main language (or
+the program's marked one), and digits follow the Number language: the language around them, the main language, or
+the chosen language when it has a voice.
 Languages that share a script cannot be told apart by it: Latin text in English text stays English, so a French word
 in an English sentence is read by the English voice. Only text in a script of its own, or marked by the program,
 switches.
@@ -89,16 +97,18 @@ The configuration program
 
 General tab
     Main language
-        The language of the text: what WorldVoice reads in when nothing else decides, and the language of numbers.
-        The list holds the languages that have a voice chosen. When the main language has none, English is used if it
-        has a voice, else another language that has one.
+        The language of the text: what WorldVoice reads in when nothing else decides. The list holds the languages
+        that have a voice chosen. When the main language has none, English is used if it has a voice, else another
+        language that has one.
     Language detection
         Language assumed for Latin, CJK, Arabic, Cyrillic and Devanagari characters: the language for that script's
         text when the text around it is not already in one of the script's languages (see above). Each list holds the
         script's languages that have a voice chosen, and is unavailable when there are none. The WorldVoice add-on
         offers Latin, CJK and Arabic; Cyrillic and Devanagari are added here, for the same reason.
-        Ignore numbers when detecting text language: numbers are read in the language of the text around them, not by
-        the main language's voice. Off by default.
+        Number language: the language numbers are read in: "Follow surrounding text language" (the default), "Follow
+        main language", or one of the languages that have a voice (see above). It replaces WorldVoice's earlier
+        "Ignore numbers when detecting text language", as in the add-on's version 7.0; the earlier setting is not
+        carried over.
 Voices tab
     Languages and their voices
         Every language an installed voice speaks, with its voice and its rate, pitch and volume adjustments.
@@ -172,8 +182,9 @@ Where the settings are kept
 HKEY_CURRENT_USER\SOFTWARE\WorldVoice:
     MainLanguage, LatinLanguage, HanLanguage, ArabicLanguage, CyrillicLanguage, DevanagariLanguage
         language codes such as en, zh, ja (defaults: en, en, zh, ar, ru, hi)
-    NumbersFollowText
-        DWORD, 1 when "Ignore numbers when detecting text language" is ticked
+    NumberLanguage
+        default (follow the surrounding text, the default), main (follow the main language), or a language code such
+        as en
     Voices\<language>
         the voice chosen for the language (its SAPI 5 token, such as
         HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0); no value means None

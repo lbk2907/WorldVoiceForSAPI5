@@ -65,9 +65,10 @@ inline const char* ScriptOf(uint32_t cp) {
     const CodeRange* r = FindRange(kScriptRanges, ARRAYSIZE(kScriptRanges), cp);
     return r ? kScriptNames[r->value] : nullptr;
 }
-inline bool IsDigit(uint32_t cp) { return FindRange(kDigits, ARRAYSIZE(kDigits), cp) != nullptr; }
 inline bool IsDecimal(uint32_t cp) { return FindRange(kDecimals, ARRAYSIZE(kDecimals), cp) != nullptr; }
 inline bool IsSpace(uint32_t cp) { return FindRange(kSpaces, ARRAYSIZE(kSpaces), cp) != nullptr; }
+inline bool IsWordChar(uint32_t cp) { return FindRange(kWordChars, ARRAYSIZE(kWordChars), cp) != nullptr; }
+inline bool IsNumberSymbol(uint32_t cp) { return FindRange(kNumberSymbols, ARRAYSIZE(kNumberSymbols), cp) != nullptr; }
 
 // The code point at text[i], and how many UTF-16 units it takes.
 inline uint32_t CodePointAt(const wchar_t* text, size_t len, size_t i, size_t* units) {
@@ -78,6 +79,55 @@ inline uint32_t CodePointAt(const wchar_t* text, size_t len, size_t i, size_t* u
     }
     *units = 1;
     return c;
+}
+// The code point that ends just before text[i]; 0 at the start.
+inline uint32_t CodePointBefore(const wchar_t* text, size_t i) {
+    if (i == 0) return 0;
+    wchar_t c = text[i - 1];
+    if (IS_LOW_SURROGATE(c) && i >= 2 && IS_HIGH_SURROGATE(text[i - 2]))
+        return 0x10000 + (((uint32_t)text[i - 2] - 0xD800) << 10) + ((uint32_t)c - 0xDC00);
+    return c;
+}
+
+// ---------------------------------------------------------------------------
+// Numbers (the add-on's pipeline\numbers.py and numberStages.py)
+// ---------------------------------------------------------------------------
+
+// The next match of the add-on's NUMBER_RE in text[from, len), as finditer finds it: an optional sign that is not
+// right after a digit, digits, then any number of (symbols, digits), where a digit is any Unicode decimal digit (\d)
+// and the symbols are Latin-1 punctuation and symbols ("12,345", "5-3", "12:30" and "2×3" are one number each).
+inline bool NextNumber(const wchar_t* t, size_t len, size_t from, size_t& start, size_t& end) {
+    size_t units = 1, u = 1;
+    for (size_t p = from; p < len; p += units) {
+        uint32_t c = CodePointAt(t, len, p, &units);
+        size_t d = ((c == L'+' || c == L'-') && !IsDecimal(CodePointBefore(t, p))) ? p + 1 : p;
+        if (d >= len || !IsDecimal(CodePointAt(t, len, d, &u))) continue;
+        size_t e = d;
+        while (e < len && IsDecimal(CodePointAt(t, len, e, &u))) e += u;
+        for (;;) {
+            size_t k = e;
+            while (k < len && IsNumberSymbol(t[k])) k++;
+            if (k == e || k >= len || !IsDecimal(CodePointAt(t, len, k, &u))) break;
+            e = k;
+            while (e < len && IsDecimal(CodePointAt(t, len, e, &u))) e += u;
+        }
+        start = p;
+        end = e;
+        return true;
+    }
+    return false;
+}
+
+// The numbers of a text for its number language (_split_numbers_for_language): NUMBER_RE's matches, except that a
+// sign right after a word character is a hyphen, as in "COVID-19", and stays with the text before it.
+inline std::vector<std::pair<size_t, size_t>> NumbersForLanguage(const wchar_t* t, size_t len) {
+    std::vector<std::pair<size_t, size_t>> out;
+    size_t start = 0, end = 0;
+    for (size_t from = 0; NextNumber(t, len, from, start, end); from = end) {
+        if ((t[start] == L'+' || t[start] == L'-') && start > 0 && IsWordChar(CodePointBefore(t, start))) start++;
+        out.push_back({ start, end });
+    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,10 +201,15 @@ struct Adjustment {
 inline int ClampAdjustment(int v) { return v < -10 ? -10 : (v > 10 ? 10 : v); }
 inline int ClampFactor(DWORD v) { return v > 100 ? 100 : (int)v; }   // a wait factor, 0..100
 
+// The number languages that are not a language (the add-on's numberLanguage.py): numbers read in the language of the
+// text around them (the default), or in the main language (the language the program marks, or the main voice's).
+static const wchar_t* const kNumbersFollow = L"default";
+static const wchar_t* const kNumbersMain = L"main";
+
 struct Settings {
     std::wstring mainLanguage = L"en", latinLanguage = L"en", hanLanguage = L"zh", arabicLanguage = L"ar";
     std::wstring cyrillicLanguage = L"ru", devanagariLanguage = L"hi";
-    bool numbersFollowText = false;
+    std::wstring numberLanguage = kNumbersFollow;    // number_language: kNumbersFollow, kNumbersMain or a language
     std::map<std::wstring, std::wstring> voices;     // language -> token id, or kNoVoice
     std::map<std::wstring, Adjustment> adjustments;  // language -> its adjustments
     // WorldVoice's number mode and punctuation pauses (its pipeline settings of the same names)
@@ -184,7 +239,9 @@ struct Settings {
         str(L"CyrillicLanguage", cyrillicLanguage);
         str(L"DevanagariLanguage", devanagariLanguage);
         DWORD d = 0;
-        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"NumbersFollowText", d)) numbersFollowText = d != 0;
+        std::wstring numbers;
+        if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberLanguage", numbers) && !numbers.empty())
+            numberLanguage = (numbers == kNumbersFollow || numbers == kNumbersMain) ? numbers : PrimaryLanguage(numbers);
         std::wstring mode;
         if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"value" || mode == L"number" || mode == L"pair")) numberMode = mode;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PairWaitFactor", d)) pairWaitFactor = ClampFactor(d);
@@ -361,11 +418,18 @@ class Detector {
 public:
     Detector(const Settings& s, const VoiceMap& map) : m_settings(s), m_map(map) {}
 
-    // find_language_for_script
-    std::wstring LanguageForScript(const char* script, const std::wstring& current) const {
+    // _covers: the language is one of the script's and has a voice
+    bool Covers(const std::wstring& lang, const std::vector<std::wstring>& candidates) const {
+        std::wstring p = PrimaryLanguage(lang);
+        return std::find(candidates.begin(), candidates.end(), p) != candidates.end() && m_map.Has(p);
+    }
+
+    // find_language_for_script: the current language, the base language, the configured one, then the first with a
+    // voice; the current language if none has a voice.
+    std::wstring LanguageForScript(const char* script, const std::wstring& current, const std::wstring& base) const {
         std::vector<std::wstring> candidates = ScriptLanguageList(script);
-        std::wstring currentPrimary = PrimaryLanguage(current);
-        if (candidates.empty() || std::find(candidates.begin(), candidates.end(), currentPrimary) != candidates.end()) return current;
+        if (candidates.empty() || Covers(current, candidates)) return current;
+        if (!base.empty() && Covers(base, candidates)) return base;
         std::wstring configured = m_settings.ConfiguredFor(script);
         if (!configured.empty()) {
             std::wstring p = PrimaryLanguage(configured);
@@ -375,24 +439,44 @@ public:
         return current;
     }
 
-    // _language_for_character
+    // _language_for_character. A decimal digit of any script stays in the current run: a number's language is its
+    // number language (NumberLanguageAt).
     std::wstring LanguageForCharacter(uint32_t cp, const std::wstring& current, const std::wstring& base) const {
-        if (IsDigit(cp)) return m_settings.numbersFollowText ? current : base;
+        if (IsDecimal(cp)) return current;
         const char* script = ScriptOf(cp);
         if (!script || !strcmp(script, "Common") || !strcmp(script, "Inherited")) return current;
-        return LanguageForScript(script, current);
+        return LanguageForScript(script, current, base);
     }
 
-    // process_for_spelling's choice for one character
+    // process_for_spelling's choice for one character; base is the language spelling starts in.
     std::wstring LanguageForSpelling(uint32_t cp, const std::wstring& current, const std::wstring& base) const {
-        std::wstring target;
-        if (IsSpace(cp) || IsDigit(cp)) target = base;
-        else {
-            const char* script = ScriptOf(cp);
-            target = (!script || !strcmp(script, "Common") || !strcmp(script, "Inherited")) ? current : LanguageForScript(script, current);
+        if (IsSpace(cp)) return base;
+        if (IsDecimal(cp)) {                 // _spelling_language_for_digit
+            const std::wstring& n = m_settings.numberLanguage;
+            if (n == kNumbersFollow) return current;
+            if (n != kNumbersMain && m_map.Has(n)) return n;
+            return base;
         }
-        if (PrimaryLanguage(target) == PrimaryLanguage(base)) target = base;
-        return target;
+        const char* script = ScriptOf(cp);
+        if (!script || !strcmp(script, "Common") || !strcmp(script, "Inherited")) return current;
+        return LanguageForScript(script, current, base);
+    }
+
+    // The language a number is read in, where the language in force is inForce (detect_with_number_language, and
+    // inject_numbers for a language): empty when numbers follow the text around them.
+    std::wstring NumberLanguageAt(const std::wstring& inForce) const {
+        const std::wstring& n = m_settings.numberLanguage;
+        if (n == kNumbersFollow) return std::wstring();
+        return n == kNumbersMain ? inForce : n;
+    }
+
+    // Whether two languages are read by the same voice (a language with no voice is read by the main language's):
+    // the add-on keeps a language switch only where the voice changes (deduplicate_language_command).
+    bool SameVoice(const std::wstring& a, const std::wstring& b) const {
+        std::wstring va = m_map.VoiceFor(a), vb = m_map.VoiceFor(b), main = m_map.VoiceFor(m_map.MainLanguage());
+        if (va.empty()) va = main;
+        if (vb.empty()) vb = main;
+        return _wcsicmp(va.c_str(), vb.c_str()) == 0;
     }
 
 private:

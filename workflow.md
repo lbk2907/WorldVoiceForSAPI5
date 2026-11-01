@@ -7,8 +7,9 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
 ## The add-on's rules come first
 
 * **Split a text exactly as the add-on does.**  The language detection in `common\WorldVoice.h` is a rule-for-rule
-  port of the add-on's `languageDetection` module, version 6.2 (`find_language_for_script`,
-  `_language_for_character`, `add_detected_language_commands` and `process_for_spelling`).  The number mode and the
+  port of the add-on's `languageDetection` module, version 7.0 (`find_language_for_script`,
+  `_language_for_character`, `add_detected_language_commands` and `process_for_spelling`), with its number language
+  (`detect_with_number_language`, `_split_numbers_for_language`) done in the split in `sapi\WorldVoiceSapi.cpp`.  The number mode and the
   pauses at punctuation in `sapi\Pipeline.h` are the same kind of port of the add-on's speech pipeline
   (`iter_number_speech_segments_mode`, `_translate_number` and `inject_punctuation_pause`), from its master branch
   after 6.2, and run before the split, as the add-on runs them before its detection.  A text split or changed

@@ -43,7 +43,7 @@ static void Save() {
     SetString(L"CyrillicLanguage", g_settings.cyrillicLanguage);
     SetString(L"DevanagariLanguage", g_settings.devanagariLanguage);
     auto setDword = [](const wchar_t* name, DWORD v) { RegSetKeyValueW(HKEY_CURRENT_USER, wv::kSettingsKey, name, REG_DWORD, &v, sizeof(v)); };
-    setDword(L"NumbersFollowText", g_settings.numbersFollowText ? 1 : 0);
+    SetString(L"NumberLanguage", g_settings.numberLanguage);
     SetString(L"NumberMode", g_settings.numberMode);
     setDword(L"PairWaitFactor", (DWORD)g_settings.pairWaitFactor);
     setDword(L"PunctuationPause", g_settings.punctuationPause ? 1 : 0);
@@ -203,6 +203,27 @@ static ScriptChoice g_scripts[] = {
     { IDC_DEVANAGARI, IDC_DEVANAGARI_L, "Devanagari", &wv::Settings::devanagariLanguage, {} },
 };
 
+// The number language, as WorldVoice offers it: the text's language, the main language, then the languages with a
+// voice (and the one chosen, if its voice has gone). What each item of the list stands for.
+static std::vector<std::wstring> g_numberChoices;
+
+static void FillNumberLanguages(HWND d, const wv::VoiceMap& map) {
+    g_numberChoices = { wv::kNumbersFollow, wv::kNumbersMain };
+    std::vector<std::wstring> langs(map.Languages().begin(), map.Languages().end());
+    const std::wstring& chosen = g_settings.numberLanguage;
+    if (chosen != wv::kNumbersFollow && chosen != wv::kNumbersMain && !map.Has(chosen)) langs.push_back(chosen);
+    std::sort(langs.begin(), langs.end(), [](const std::wstring& a, const std::wstring& b) { return wv::LanguageName(a) < wv::LanguageName(b); });
+    g_numberChoices.insert(g_numberChoices.end(), langs.begin(), langs.end());
+    SendDlgItemMessageW(d, IDC_NUMLANG, CB_RESETCONTENT, 0, 0);
+    int sel = 0;
+    for (size_t i = 0; i < g_numberChoices.size(); i++) {
+        const std::wstring& c = g_numberChoices[i];
+        AddItem(d, IDC_NUMLANG, c == wv::kNumbersFollow ? L"Follow surrounding text language" : (c == wv::kNumbersMain ? L"Follow main language" : wv::LanguageName(c)));
+        if (c == chosen) sel = (int)i;
+    }
+    SendDlgItemMessageW(d, IDC_NUMLANG, CB_SETCURSEL, sel, 0);
+}
+
 // ---- Numbers and punctuation tab ----
 
 // WorldVoice's number modes, in its order.
@@ -268,7 +289,7 @@ static void Fill(HWND d) {
         EnableWindow(GetDlgItem(d, sc.id), !sc.languages.empty());
         EnableWindow(GetDlgItem(d, sc.labelId), !sc.languages.empty());
     }
-    CheckDlgButton(d, IDC_NUMBERS, g_settings.numbersFollowText ? BST_CHECKED : BST_UNCHECKED);
+    FillNumberLanguages(d, map);
     FillNumbersAndPunctuation(d);
     g_filling = false;
 }
@@ -481,9 +502,11 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
                         if (!lang.empty()) { g_settings.*sc.setting = lang; Save(); }
                     }
             break;
-        case IDC_NUMBERS:
-            g_settings.numbersFollowText = IsDlgButtonChecked(d, IDC_NUMBERS) == BST_CHECKED;
-            Save();
+        case IDC_NUMLANG:
+            if (HIWORD(wp) == CBN_SELCHANGE) {
+                int item = (int)SendDlgItemMessageW(d, IDC_NUMLANG, CB_GETCURSEL, 0, 0);
+                if (item >= 0 && item < (int)g_numberChoices.size()) { g_settings.numberLanguage = g_numberChoices[item]; Save(); }
+            }
             break;
         case IDC_NUMMODE:
             if (HIWORD(wp) == CBN_SELCHANGE) {
