@@ -503,7 +503,7 @@ private:
     DWORD OutRate();
     SubVoice* Voice(const std::wstring& id);
     std::shared_ptr<const wv::ResampleFilter> FilterFrom(DWORD rate);
-    void Split(const wv::Detector& detector, const std::wstring& base, const SPVTEXTFRAG* frags, std::vector<Piece>& pieces);
+    void Split(const wv::Detector& detector, const std::wstring& base, const SPVTEXTFRAG* frags, const std::vector<bool>& inNumber, std::vector<Piece>& pieces);
 
     LONG m_refs = 1;
     ISpObjectToken* m_token = nullptr;
@@ -576,8 +576,9 @@ SubVoice* WorldVoiceEngine::Voice(const std::wstring& id) {
 
 // Splits the text into pieces by language, as WorldVoice's add_detected_language_commands (and, for spelled
 // text, process_for_spelling) does. A piece keeps the original text and positions, so its voice reports word
-// positions in the program's text. Silences, bookmarks and the like go with the piece they come in.
-void WorldVoiceEngine::Split(const wv::Detector& detector, const std::wstring& base, const SPVTEXTFRAG* frags, std::vector<Piece>& pieces) {
+// positions in the program's text. Silences, bookmarks and the like go with the piece they come in. inNumber marks the
+// fragments (in a row from frags) that the pipeline put inside a number language's switches; empty for none.
+void WorldVoiceEngine::Split(const wv::Detector& detector, const std::wstring& base, const SPVTEXTFRAG* frags, const std::vector<bool>& inNumber, std::vector<Piece>& pieces) {
     std::wstring current = base, temporary = base;      // WorldVoice's curLang and tmpLang
     LANGID langId = m_tokenLangId;
     auto add = [&](const std::wstring& lang, const SPVTEXTFRAG& f) {
@@ -592,6 +593,15 @@ void WorldVoiceEngine::Split(const wv::Detector& detector, const std::wstring& b
             std::wstring marked = (langId && langId != m_tokenLangId) ? wv::LanguageOfLcid(langId) : std::wstring();
             current = marked.empty() ? base : marked;
             temporary = current;
+        }
+        // A number inside its number language's switches (Pipeline.h): its pieces, its symbols among them, and the
+        // pauses between them are read in the number language, unless that is the voice already reading; after it,
+        // the language in force again.
+        if (!inNumber.empty() && inNumber[f - frags]) {
+            std::wstring numberLang = detector.NumberLanguageAt(current);
+            add(detector.SameVoice(numberLang, temporary) ? temporary : numberLang, *f);
+            temporary = current;
+            continue;
         }
         bool text = (f->State.eAction == SPVA_Speak || f->State.eAction == SPVA_Pronounce || f->State.eAction == SPVA_SpellOut) && f->pTextStart && f->ulTextLen;
         if (!text) { add(temporary, *f); continue; }
@@ -709,12 +719,13 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
     };
 
     // WorldVoice's number mode and punctuation pauses, before the language detection, as in the add-on.
-    wv::Pipeline pipeline(settings);
+    wv::Pipeline pipeline(settings, detector, base, m_tokenLangId);
     std::vector<SPVTEXTFRAG> filtered;
+    std::vector<bool> numbers;
     const SPVTEXTFRAG* text = frags;
-    if (pipeline.Apply(frags, filtered)) text = filtered.empty() ? nullptr : filtered.data();
+    if (pipeline.Apply(frags, filtered, numbers)) text = filtered.empty() ? nullptr : filtered.data();
     std::vector<Piece> pieces;
-    Split(detector, base, text, pieces);
+    Split(detector, base, text, numbers, pieces);
     if (LogEnabled()) {
         std::string list;
         for (const Piece& p : pieces) {

@@ -2,25 +2,27 @@
 // and WorldVoice's language detection (the NVDA add-on's languageDetection, rule for rule).
 //
 // Settings, HKCU\SOFTWARE\WorldVoice:
-//   MainLanguage       the main language, e.g. "en" (its voice reads numbers and anything with no script)
+//   MainLanguage       the main language, e.g. "en" (its voice reads anything with no script)
 //   LatinLanguage      the language assumed for Latin characters when the text around them is not a Latin language
 //   HanLanguage        the same for CJK characters (Han): "zh", "ja" or "ko"
-//   ArabicLanguage, CyrillicLanguage, DevanagariLanguage   the same for those scripts (WorldVoice itself has
-//                      settings for Latin, CJK and Arabic; the other scripts it can switch belong to one language)
-//   NumbersFollowText  DWORD 1: numbers are read in the language of the text around them (WorldVoice's "ignore
-//                      numbers in language detection"); 0 (the default): by the main language's voice
+//   ArabicLanguage, CyrillicLanguage, DevanagariLanguage   the same for those scripts
+//   NumberLanguage     "default" (the default: numbers follow the text around them), "main" (the main language), or a
+//                      language: WorldVoice's number language
 //   Voices\<language>  the voice for that language (a SAPI 5 voice token id); missing = none: WorldVoice does
 //                      not switch to that language. With no voice chosen at all, Windows' default voice reads
 //                      everything (see VoiceMap).
 //   Adjustments\<language>  DWORDs Rate, Pitch, Volume, each -10..10, 0 = as the speaking program asks: rate and
 //                      pitch in SAPI's steps, added to the program's; volume 10% per step
-//   NumberMode         "value" (the default), "number" (digit by digit) or "pair" (two digits at a time): WorldVoice's
-//                      number mode
-//   PairWaitFactor     DWORD 0..100: in pair mode, a pause of 5 ms per step between the pairs; 0 (the default): a space
+//   NumberMode         "none", "value" (the default), "number" (digit by digit) or "group" (GroupSize digits at a
+//                      time): WorldVoice's number mode
+//   GroupSize          DWORD 2..10 (default 3)
+//   GlobalWaitFactor   DWORD 0..100 in tens (default 10): each pause is its factor times this factor's tens, in ms
+//   NumberWaitFactor   DWORD 0..100 (default 10): the pause between numbers, and in Number and Group modes between
+//                      a number's pieces and around a number
 //   PunctuationPause   DWORD 1 (the default): pauses at punctuation, PunctuationWaitFactor long; 0: none
-//   PunctuationWaitFactor  DWORD 0..100: 5 ms per step, at most 500 ms; 0 (the default): no pause
+//   PunctuationWaitFactor  DWORD 0..100 (default 0)
 //   RemovePunctuation  DWORD 1: the punctuation marks where a pause can go are left out of the text; 0 (the default)
-//   PunctuationCharacters  the marks those are (missing: WorldVoice's own, kPunctuationCharacters)
+//   PunctuationCharacters  the marks those are, as typed (missing: none)
 //   Log                DWORD 1: the voice writes %TEMP%\WorldVoice.log
 #pragma once
 #define WIN32_LEAN_AND_MEAN
@@ -39,9 +41,6 @@ static const wchar_t* const kSettingsKey = L"SOFTWARE\\WorldVoice";
 static const wchar_t* const kVoicesKey = L"SOFTWARE\\WorldVoice\\Voices";
 static const wchar_t* const kAdjustmentsKey = L"SOFTWARE\\WorldVoice\\Adjustments";
 static const wchar_t* const kNoVoice = L"-";
-// WorldVoice's punctuation pause characters: Arabic comma, Arabic semicolon, comma, full stop, semicolon, colon,
-// exclamation mark, Arabic question mark, question mark, ellipsis.
-static const wchar_t* const kPunctuationCharacters = L"،؛,.;:!؟?…";
 // SAPI XML <context id="WorldVoiceTest:<language>">: the configuration program's test of one language's voice.
 static const wchar_t* const kTestContext = L"WorldVoiceTest:";
 
@@ -212,17 +211,20 @@ struct Settings {
     std::wstring numberLanguage = kNumbersFollow;    // number_language: kNumbersFollow, kNumbersMain or a language
     std::map<std::wstring, std::wstring> voices;     // language -> token id, or kNoVoice
     std::map<std::wstring, Adjustment> adjustments;  // language -> its adjustments
-    // WorldVoice's number mode and punctuation pauses (its pipeline settings of the same names)
-    std::wstring numberMode = L"value";              // number_mode
-    int pairWaitFactor = 0;                          // pair_wait_factor, 0..100
+    // WorldVoice's number stages and punctuation pauses (its pipeline settings of the same names, version 7.0)
+    std::wstring numberMode = L"value";              // number_mode: none, value, number or group
+    int groupSize = 3;                               // group_size, 2..10
+    int globalWaitFactor = 10;                       // global_wait_factor, 0..100 in tens
+    int numberWaitFactor = 10;                       // number_wait_factor, 0..100
     bool punctuationPause = true;                    // punctuation_pause_enabled
     int punctuationWaitFactor = 0;                   // punctuation_wait_factor, 0..100
     bool removePunctuation = false;                  // remove_punctuation_characters
-    std::wstring punctuationCharacters = kPunctuationCharacters;   // punctuation_pause_characters, as typed
+    std::wstring punctuationCharacters;              // punctuation_pause_characters, as typed (none by default)
 
-    // WorldVoice's scaled_punctuation_wait and scaled_pair_wait: 5 ms a step, at most 500 ms.
-    int PunctuationWaitMs() const { return (std::min)(punctuationWaitFactor * 5, 500); }
-    int PairWaitMs() const { return (std::min)(pairWaitFactor * 5, 500); }
+    // WorldVoice's scaled waits: a factor's pause is the global wait factor's tens times the factor, in ms.
+    int GlobalUnits() const { return globalWaitFactor / 10; }
+    int NumberWaitMs() const { return GlobalUnits() * numberWaitFactor; }
+    int PunctuationWaitMs() const { return GlobalUnits() * punctuationWaitFactor; }
 
     Adjustment AdjustmentFor(const std::wstring& lang) const {
         auto it = adjustments.find(PrimaryLanguage(lang));
@@ -242,9 +244,11 @@ struct Settings {
         std::wstring numbers;
         if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberLanguage", numbers) && !numbers.empty())
             numberLanguage = (numbers == kNumbersFollow || numbers == kNumbersMain) ? numbers : PrimaryLanguage(numbers);
-        std::wstring mode;
-        if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"value" || mode == L"number" || mode == L"pair")) numberMode = mode;
-        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PairWaitFactor", d)) pairWaitFactor = ClampFactor(d);
+        std::wstring mode;      // any other mode reads as value (_number_mode)
+        if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"none" || mode == L"number" || mode == L"group")) numberMode = mode;
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"GroupSize", d) && d >= 2 && d <= 10) groupSize = (int)d;   // else 3
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"GlobalWaitFactor", d)) globalWaitFactor = ClampFactor(d) / 10 * 10;
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"NumberWaitFactor", d)) numberWaitFactor = ClampFactor(d);
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationPause", d)) punctuationPause = d != 0;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationWaitFactor", d)) punctuationWaitFactor = ClampFactor(d);
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"RemovePunctuation", d)) removePunctuation = d != 0;

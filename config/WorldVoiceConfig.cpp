@@ -44,8 +44,10 @@ static void Save() {
     SetString(L"DevanagariLanguage", g_settings.devanagariLanguage);
     auto setDword = [](const wchar_t* name, DWORD v) { RegSetKeyValueW(HKEY_CURRENT_USER, wv::kSettingsKey, name, REG_DWORD, &v, sizeof(v)); };
     SetString(L"NumberLanguage", g_settings.numberLanguage);
+    setDword(L"GlobalWaitFactor", (DWORD)g_settings.globalWaitFactor);
     SetString(L"NumberMode", g_settings.numberMode);
-    setDword(L"PairWaitFactor", (DWORD)g_settings.pairWaitFactor);
+    setDword(L"GroupSize", (DWORD)g_settings.groupSize);
+    setDword(L"NumberWaitFactor", (DWORD)g_settings.numberWaitFactor);
     setDword(L"PunctuationPause", g_settings.punctuationPause ? 1 : 0);
     setDword(L"PunctuationWaitFactor", (DWORD)g_settings.punctuationWaitFactor);
     setDword(L"RemovePunctuation", g_settings.removePunctuation ? 1 : 0);
@@ -227,43 +229,54 @@ static void FillNumberLanguages(HWND d, const wv::VoiceMap& map) {
 // ---- Numbers and punctuation tab ----
 
 // WorldVoice's number modes, in its order.
-static const wchar_t* const kNumberModes[] = { L"value", L"number", L"pair" };
-static const wchar_t* const kNumberModeNames[] = { L"Value", L"Number (digit by digit)", L"Pair (two digits at a time)" };
+static const wchar_t* const kNumberModes[] = { L"none", L"value", L"number", L"group" };
+static const wchar_t* const kNumberModeNames[] = { L"Off", L"Value", L"Number (digit by digit)", L"Group (digits in groups)" };
 
-// A wait factor as shown: its pause, 5 ms a step (at most 500 ms).
-static std::wstring WaitText(int factor) { return std::to_wstring((std::min)(factor * 5, 500)) + L" ms"; }
+// A wait factor as shown: its pause, the global wait factor's tens times the factor, in ms.
+static std::wstring WaitText(int factor) { return std::to_wstring(g_settings.GlobalUnits() * factor) + L" ms"; }
 
-// As in WorldVoice: the punctuation wait factor only with the pauses on, the characters with the pauses or the
-// removal on.
-static void EnablePunctuation(HWND d) {
-    bool pause = g_settings.punctuationPause, chars = pause || g_settings.removePunctuation;
-    for (int id : { IDC_PUNCTWAIT, IDC_PUNCTWAIT_L, IDC_PUNCTWAIT_V }) EnableWindow(GetDlgItem(d, id), pause);
-    for (int id : { IDC_PUNCTCHARS, IDC_PUNCTCHARS_L }) EnableWindow(GetDlgItem(d, id), chars);
+// As in WorldVoice: the group size only in group mode; the removal, the punctuation wait factor and the characters
+// only with the pauses on.
+static void EnableNumbersAndPunctuation(HWND d) {
+    bool group = g_settings.numberMode == L"group", pause = g_settings.punctuationPause;
+    for (int id : { IDC_GROUPSIZE, IDC_GROUPSIZE_L, IDC_GROUPSIZE_SPIN }) EnableWindow(GetDlgItem(d, id), group);
+    for (int id : { IDC_PUNCTREMOVE, IDC_PUNCTWAIT, IDC_PUNCTWAIT_L, IDC_PUNCTWAIT_V, IDC_PUNCTCHARS, IDC_PUNCTCHARS_L })
+        EnableWindow(GetDlgItem(d, id), pause);
+}
+
+static void ShowWaits(HWND d) {
+    SetDlgItemTextW(d, IDC_GLOBALWAIT_V, std::to_wstring(g_settings.GlobalUnits()).c_str());
+    SetDlgItemTextW(d, IDC_NUMWAIT_V, WaitText(g_settings.numberWaitFactor).c_str());
+    SetDlgItemTextW(d, IDC_PUNCTWAIT_V, WaitText(g_settings.punctuationWaitFactor).c_str());
 }
 
 static void FillNumbersAndPunctuation(HWND d) {
-    int mode = 0;
-    for (int i = 0; i < 3; i++) if (g_settings.numberMode == kNumberModes[i]) mode = i;
+    int mode = 1;
+    for (int i = 0; i < ARRAYSIZE(kNumberModes); i++) if (g_settings.numberMode == kNumberModes[i]) mode = i;
+    SendDlgItemMessageW(d, IDC_GLOBALWAIT, TBM_SETPOS, TRUE, g_settings.GlobalUnits());
     SendDlgItemMessageW(d, IDC_NUMMODE, CB_SETCURSEL, mode, 0);
-    SendDlgItemMessageW(d, IDC_PAIRWAIT, TBM_SETPOS, TRUE, g_settings.pairWaitFactor);
-    SetDlgItemTextW(d, IDC_PAIRWAIT_V, WaitText(g_settings.pairWaitFactor).c_str());
+    SetDlgItemInt(d, IDC_GROUPSIZE, g_settings.groupSize, FALSE);
+    SendDlgItemMessageW(d, IDC_NUMWAIT, TBM_SETPOS, TRUE, g_settings.numberWaitFactor);
     CheckDlgButton(d, IDC_PUNCTPAUSE, g_settings.punctuationPause ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(d, IDC_PUNCTREMOVE, g_settings.removePunctuation ? BST_CHECKED : BST_UNCHECKED);
     SendDlgItemMessageW(d, IDC_PUNCTWAIT, TBM_SETPOS, TRUE, g_settings.punctuationWaitFactor);
-    SetDlgItemTextW(d, IDC_PUNCTWAIT_V, WaitText(g_settings.punctuationWaitFactor).c_str());
     SetDlgItemTextW(d, IDC_PUNCTCHARS, g_settings.punctuationCharacters.c_str());
-    EnablePunctuation(d);
+    ShowWaits(d);
+    EnableNumbersAndPunctuation(d);
 }
 
-// A wait factor's slider moved: saved, and its pause shown beside it.
+// A wait factor's slider moved: saved, and the pauses shown beside the sliders. The global wait factor's slider
+// shows its tens.
 static void OnWaitSlider(HWND d, HWND slider) {
-    int value = wv::ClampFactor((DWORD)(std::max)(0, (int)SendMessageW(slider, TBM_GETPOS, 0, 0)));
-    bool pair = GetDlgCtrlID(slider) == IDC_PAIRWAIT;
-    int& field = pair ? g_settings.pairWaitFactor : g_settings.punctuationWaitFactor;
+    int value = (std::max)(0, (int)SendMessageW(slider, TBM_GETPOS, 0, 0));
+    int id = GetDlgCtrlID(slider);
+    if (id == IDC_GLOBALWAIT) value = (std::min)(value, 10) * 10;
+    else value = wv::ClampFactor((DWORD)value);
+    int& field = id == IDC_GLOBALWAIT ? g_settings.globalWaitFactor : (id == IDC_NUMWAIT ? g_settings.numberWaitFactor : g_settings.punctuationWaitFactor);
     if (field == value) return;
     field = value;
     Save();
-    SetDlgItemTextW(d, pair ? IDC_PAIRWAIT_V : IDC_PUNCTWAIT_V, WaitText(value).c_str());
+    ShowWaits(d);
 }
 
 static void Fill(HWND d) {
@@ -443,11 +456,16 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 2);
         }
         for (const wchar_t* name : kNumberModeNames) AddItem(d, IDC_NUMMODE, name);
-        for (int id : { IDC_PAIRWAIT, IDC_PUNCTWAIT }) {
+        for (int id : { IDC_NUMWAIT, IDC_PUNCTWAIT }) {
             SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, 0);
             SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 100);
             SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 10);
         }
+        SendDlgItemMessageW(d, IDC_GLOBALWAIT, TBM_SETRANGEMIN, FALSE, 0);
+        SendDlgItemMessageW(d, IDC_GLOBALWAIT, TBM_SETRANGEMAX, TRUE, 10);
+        SendDlgItemMessageW(d, IDC_GLOBALWAIT, TBM_SETPAGESIZE, 0, 1);
+        SendDlgItemMessageW(d, IDC_GROUPSIZE_SPIN, UDM_SETRANGE32, 2, 10);
+        SendDlgItemMessageW(d, IDC_GROUPSIZE, EM_LIMITTEXT, 2, 0);
         SendDlgItemMessageW(d, IDC_PUNCTCHARS, EM_LIMITTEXT, 200, 0);
         Fill(d);
         ShowPage(d, 0);
@@ -464,7 +482,7 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_HSCROLL:
         if (!g_filling && lp) {
             int id = GetDlgCtrlID((HWND)lp);
-            if (id == IDC_PAIRWAIT || id == IDC_PUNCTWAIT) OnWaitSlider(d, (HWND)lp);
+            if (id == IDC_GLOBALWAIT || id == IDC_NUMWAIT || id == IDC_PUNCTWAIT) OnWaitSlider(d, (HWND)lp);
             else OnSlider(d, (HWND)lp);
         }
         return TRUE;
@@ -511,7 +529,14 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_NUMMODE:
             if (HIWORD(wp) == CBN_SELCHANGE) {
                 int item = (int)SendDlgItemMessageW(d, IDC_NUMMODE, CB_GETCURSEL, 0, 0);
-                if (item >= 0 && item < 3) { g_settings.numberMode = kNumberModes[item]; Save(); }
+                if (item >= 0 && item < ARRAYSIZE(kNumberModes)) { g_settings.numberMode = kNumberModes[item]; Save(); EnableNumbersAndPunctuation(d); }
+            }
+            break;
+        case IDC_GROUPSIZE:
+            if (HIWORD(wp) == EN_CHANGE) {          // saved once it is a size WorldVoice takes, 2 to 10
+                BOOL ok = FALSE;
+                UINT size = GetDlgItemInt(d, IDC_GROUPSIZE, &ok, FALSE);
+                if (ok && size >= 2 && size <= 10 && (int)size != g_settings.groupSize) { g_settings.groupSize = (int)size; Save(); }
             }
             break;
         case IDC_PUNCTPAUSE:
@@ -519,7 +544,7 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             g_settings.punctuationPause = IsDlgButtonChecked(d, IDC_PUNCTPAUSE) == BST_CHECKED;
             g_settings.removePunctuation = IsDlgButtonChecked(d, IDC_PUNCTREMOVE) == BST_CHECKED;
             Save();
-            EnablePunctuation(d);
+            EnableNumbersAndPunctuation(d);
             break;
         case IDC_PUNCTCHARS:
             if (HIWORD(wp) == EN_CHANGE) {
@@ -590,7 +615,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
         return 0;
     }
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_STANDARD_CLASSES | ICC_TAB_CLASSES | ICC_LISTVIEW_CLASSES };
+    INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_STANDARD_CLASSES | ICC_TAB_CLASSES | ICC_LISTVIEW_CLASSES | ICC_UPDOWN_CLASS };
     InitCommonControlsEx(&icc);
     HWND d = CreateDialogParamW(inst, MAKEINTRESOURCEW(IDD_MAIN), nullptr, MainDlg, 0);
     if (!d) return 1;

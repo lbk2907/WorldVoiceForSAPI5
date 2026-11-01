@@ -63,34 +63,58 @@ switches.
 
 Numbers and punctuation
 
-Before the text is split by language, WorldVoice does what the add-on does with numbers and punctuation (the
-settings are on the configuration program's Numbers and punctuation tab).
+Before the text is split by language, WorldVoice does what the add-on (version 7.0) does with numbers and
+punctuation (the settings are on the configuration program's Numbers and punctuation tab).
+Pauses
+    Each pause is its wait factor times the global wait factor's tens, in milliseconds: at the global wait factor's
+    default, 10 (shown as 1), a wait factor of 15 is a 15 ms pause; at 30 (shown as 3), it is 45 ms. There is no
+    upper limit. With a global wait factor of 0 every pause is 0 ms, which still parts the text there.
 Number mode
-    Value (the default): numbers as they are written, for the voice to read its own way: "2.54.2" and
-    "192.168.1.1" stay as they are. (The add-on also sets a full stop next to a number apart with a space, so that
-    "2.54.2" is read as "2.54 . 2"; WorldVoice for SAPI 5 leaves that out, in every mode, by user request.)
+    Off: numbers are left as they are.
+    Value (the default): numbers as they are written, for the voice to read its own way, but without the commas of a
+    number written with thousands separators: "12,345,678" goes to the voice as "12345678". Only commas that make
+    whole groups of three count: "1,234,5" and "a,1,234" stay as they are.
     Number: digit by digit, "12345" as "1 2 3 4 5".
-    Pair: two digits at a time from the left, "12345" as "12 34 5"; a sign goes with the first pair ("-1234" as
-    "-12 34"), and a decimal number is read as a value. Between the pairs goes a space, or, with a pair wait factor,
-    a pause: 5 ms for each step of the factor, at most 500 ms.
+    Group: the digits in groups from the left, of the group size (3 unless you change it): "12345" as "123 45".
+    In Number and Group modes a sign goes with the first digit or group ("-1234" as "-1 2 3 4"), each symbol inside a
+    number is a piece of its own ("12:30" as "1 2 : 3 0"), and between every two pieces goes the number pause, even
+    one of 0 ms, so that the voice reads each piece on its own. When the number pause is above 0, it also comes
+    before and after a number with text next to it, and in place of the spaces between two numbers; where it meets
+    another pause (one the program asks for, or a pause at punctuation), only the longest stays.
+    The add-on reads a symbol inside a number by its name, from NVDA's symbol tables ("12:30" as "1 2 colon 3 0"). A
+    SAPI 5 voice has no such tables, so WorldVoice leaves the symbol for the voice to read, as the add-on does with a
+    symbol NVDA has no name for.
+    The add-on also sets a full stop right before or after a number apart with a space ("Room 101." as
+    "Room 101 ."). WorldVoice for SAPI 5 leaves that out, in every mode, by user request.
+Between numbers
+    In every mode, Off too, a number pause above 0 also goes between two numbers that only spaces separate
+    ("1234 5678", with a no-break space too), and between two texts the program sends that are each a number. When
+    it puts these pauses in, the add-on also strips the spaces from both ends of every text the program sends;
+    WorldVoice keeps them, because SAPI joins the texts a voice gets, and words would run together.
 Pauses at punctuation
-    With a punctuation wait factor (0, the default, is no pause), WorldVoice pauses after the punctuation pause
-    characters: 5 ms for each step, at most 500 ms. Marks in a row ("?!", "...") are one pause. The pause comes only
-    where text follows: later in the same text, or in the next text the program sends straight after it; not across
-    a bookmark, nor across a change of rate, pitch, volume, language or spelling the program makes there (NVDA's
-    commands); and never at the very end. A mark with a digit after it is not a pause point ("12,500", "3.5"). Where
-    the program already asks for a silence, its silence takes the place of the pause: they do not add up.
-    The characters are, unless you change them: the comma, full stop, semicolon, colon, exclamation mark, question
-    mark and ellipsis, and the Arabic comma, semicolon and question mark. Spaces around them are ignored; with none,
-    there are no pauses.
+    With "Enable punctuation pause control" ticked (the default), WorldVoice pauses at the punctuation pause
+    characters you type (there are none until you do), for the punctuation wait factor's pause. Its default, 0,
+    gives a pause of 0 ms, which still parts the text there.
+    Every character typed counts, a space too: type one, and every space is a pause point. Characters in a row ("?!",
+    "...") are one pause point. A character with a digit after it is not a pause point ("12,500", "3.5").
+    The pause comes only where text follows: later in the same text, or in the next text the program sends straight
+    after it; not across a bookmark, nor across a change of rate, pitch, volume, language or spelling the program
+    makes there (NVDA's commands); and never at the very end. With a number language chosen whose voice is not the
+    main language's (or the program's marked one's), the switch to a number counts as such a change: a mark right
+    before the number gets no pause, as in the add-on.
+    Where the program already asks for a silence after a text, its silence takes the place of the pause at the
+    text's end: they do not add up. Next to a number's pause in Number and Group modes, only the longer one stays.
 Removing the marks
     With "Remove configured punctuation at pause points" ticked, the marks at those pause points are left out of the
-    text, with or without the pause, so the voice neither reads them nor pauses on its own there. A mark at the very
-    end stays. A mark where the program asks for a silence is still left out.
+    text, so the voice neither reads them nor pauses on its own there. A mark at the very end stays. A mark where the
+    program asks for a silence is still left out. Where leaving out a mark empties what was between two number pauses
+    ("3.5" in Number mode, with the full stop among the characters), only one of the two pauses stays.
 WorldVoice gets the text after the program has made it ready: a mark a screen reader reads out as a word (NVDA at
-punctuation level "all") arrives as that word, and is not a mark any more. Spelled text is left as it is. In Number
-mode, the add-on can also replace each digit with a word from its own symbols dictionary; WorldVoice has no such
-dictionary, so digits stay digits.
+punctuation level "all") arrives as that word, and is not a mark any more. Spelled text is left as it is.
+Before the add-on's version 7.0, WorldVoice for SAPI 5 followed the add-on's master branch after version 6.2. Its
+Pair mode and pair wait factor are gone: Group mode with a group size of 2 reads the digits in pairs. A punctuation
+wait factor set then now gives a shorter pause (it was 5 ms a step, at most 500 ms), and the punctuation pause
+characters, which were the common marks unless you changed them, are now none unless you type them.
 
 
 The configuration program
@@ -123,20 +147,26 @@ Voices tab
         languages together, as WorldVoice reads them" ticked, Play reads it the way WorldVoice does, each language
         with its own voice. The test speaks through the installed WorldVoice voice, so it sounds exactly as in use.
 Numbers and punctuation tab
-    The add-on's settings of the same names (see "Numbers and punctuation"). Each slider goes from 0 to 100, and
-    shows its pause beside it.
+    The add-on's settings of the same names (see "Numbers and punctuation"). Beside each slider is what it gives.
+    Global wait factor
+        From 0 to 10 (1, the default); every pause below is its own wait factor times this, in ms. The add-on's
+        Speech Pipeline panel shows it the same way (it keeps it as 0 to 100, in tens).
     Number mode
-        Value (the default), Number (digit by digit) or Pair (two digits at a time).
-    Pair wait factor
-        In Pair mode, the pause between the pairs; 0 (the default): a space.
+        Off, Value (the default), Number (digit by digit) or Group (digits in groups).
+    Group size
+        In Group mode, the digits in a group, from 2 to 10 (3, the default). Unavailable in the other modes.
+    Number wait factor
+        From 0 to 100 (10, the default): the pause between numbers, and in Number and Group modes between a number's
+        pieces and around a number.
     Enable punctuation pause control
-        Ticked by default. Untick it for no pauses at punctuation, whatever the wait factor.
+        Ticked by default. Untick it for no pauses at punctuation and no marks left out.
     Remove configured punctuation at pause points
-        Off by default.
+        Off by default. Unavailable while the pause control is off.
     Punctuation wait factor
-        The pause at punctuation; 0 (the default): none. Unavailable while the pause control is off.
+        From 0 to 100 (0, the default): the pause at punctuation. Unavailable while the pause control is off.
     Punctuation pause characters
-        The marks to pause at (and to remove). Unavailable while both boxes above are unticked.
+        The characters to pause at (and to remove), as typed, a space too; none by default. Unavailable while the
+        pause control is off.
 Log tab
     The debug log: see "The debug log".
 Reset all to default (on every tab)
@@ -190,15 +220,22 @@ HKEY_CURRENT_USER\SOFTWARE\WorldVoice:
         HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0); no value means None
     Adjustments\<language>
         DWORDs Rate, Pitch and Volume, -10 to 10
+    GlobalWaitFactor
+        DWORD, 0 to 100 in tens (default 10); other values are rounded down to tens
     NumberMode
-        value (the default), number or pair
-    PairWaitFactor, PunctuationWaitFactor
-        DWORDs, 0 to 100 (default 0)
+        none, value (the default), number or group; any other value reads as value
+    GroupSize
+        DWORD, 2 to 10 (default 3); any other value reads as 3
+    NumberWaitFactor
+        DWORD, 0 to 100 (default 10)
+    PunctuationWaitFactor
+        DWORD, 0 to 100 (default 0)
     PunctuationPause, RemovePunctuation
         DWORDs, 1 when "Enable punctuation pause control" (the default) or "Remove configured punctuation at pause
         points" is ticked
     PunctuationCharacters
-        the punctuation pause characters; no value means the default ones
+        the punctuation pause characters, as typed; no value means none
+    PairWaitFactor, from earlier versions, is no longer read.
     Log
         DWORD, 1 while the debug log is on
 
@@ -240,13 +277,13 @@ first if you want them gone.
 
 Where it comes from
 
-The language detection is a rule-for-rule port of the WorldVoice NVDA add-on's (version 6.2, its languageDetection
-module: find_language_for_script, _language_for_character, add_detected_language_commands and process_for_spelling),
-and its table of the script of every character is made from that add-on's code. The number mode and the pauses at
-punctuation are a rule-for-rule port of the add-on's speech pipeline (inject_number_mode and
-inject_punctuation_pause), as its master branch has them after version 6.2 (September 2026). WorldVoice is by Tseng
-Woody: https://github.com/tsengwoody/WorldVoice. This voice also has the add-on's name. The rest (the SAPI 5 voice,
-the sound conversion and the configuration program) is written for this voice.
+The language detection is a rule-for-rule port of the WorldVoice NVDA add-on's (version 7.0, its languageDetection
+module: find_language_for_script, _language_for_character, add_detected_language_commands and process_for_spelling,
+with the number language of detect_with_number_language), and its table of the script of every character is made
+from that add-on's code. The number mode and the pauses at punctuation are a rule-for-rule port of the same version's
+speech pipeline (remove_thousands_separators, inject_numbers, inject_punctuation_pause and number_wait_factor).
+WorldVoice is by Tseng Woody: https://github.com/tsengwoody/WorldVoice. This voice also has the add-on's name. The
+rest (the SAPI 5 voice, the sound conversion and the configuration program) is written for this voice.
 
 
 Licence

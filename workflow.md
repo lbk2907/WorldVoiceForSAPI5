@@ -9,16 +9,18 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
 * **Split a text exactly as the add-on does.**  The language detection in `common\WorldVoice.h` is a rule-for-rule
   port of the add-on's `languageDetection` module, version 7.0 (`find_language_for_script`,
   `_language_for_character`, `add_detected_language_commands` and `process_for_spelling`), with its number language
-  (`detect_with_number_language`, `_split_numbers_for_language`) done in the split in `sapi\WorldVoiceSapi.cpp`.  The number mode and the
-  pauses at punctuation in `sapi\Pipeline.h` are the same kind of port of the add-on's speech pipeline
-  (`iter_number_speech_segments_mode`, `_translate_number` and `inject_punctuation_pause`), from its master branch
-  after 6.2, and run before the split, as the add-on runs them before its detection.  A text split or changed
-  differently from the add-on is a bug, unless somebody asked for the difference.
+  (`detect_with_number_language`, `_split_numbers_for_language`) done in the split in `sapi\WorldVoiceSapi.cpp`.
+  The number stages and the pauses at punctuation in `sapi\Pipeline.h` are the same kind of port of the same
+  version's speech pipeline (`remove_thousands_separators`, `inject_numbers`, `inject_punctuation_pause` and
+  `number_wait_factor`, in that order), and run before the split, as the add-on runs them before its detection.  A
+  text split or changed differently from the add-on is a bug, unless somebody asked for the difference.
 * **SAPI's fragments are the add-on's speech sequence.**  `Pipeline.h` takes the text of fragments in a row with the
   same state as one string (NVDA's SAPI 5 driver writes the strings between two commands as one text), a silence as a
-  `BreakCommand`, and a bookmark, or a change of state between two texts, as another command.  Keep that mapping when
-  porting more of the pipeline, and keep every piece of text pointing into the program's own text, so word positions
-  stay right.
+  `BreakCommand`, a change of language alone between two texts as a `LangChangeCommand`, and a bookmark, or any
+  other change of state between two texts, as another command.  A number language's switches, which the add-on puts
+  in before its other stages (`inject_numbers`), are language commands there too, and the fragments between them are
+  marked for the split, which reads them in the number language.  Keep that mapping when porting more of the
+  pipeline, and keep every piece of text pointing into the program's own text, so word positions stay right.
 * **Work from the add-on's code, not from memory.**  Read the add-on's function while porting or changing its C++
   counterpart.  The add-on is at <https://github.com/tsengwoody/WorldVoice>, and on a computer with it installed in
   `%APPDATA%\nvda\addons\WorldVoice\synthDrivers\WorldVoice`.
@@ -28,9 +30,9 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   Python 3.13, Unicode 15.1), and say which in the commit.
 * **Every departure is written down.**  What this voice adds or does its own way (the Cyrillic and Devanagari
   settings, the one sound format at the chosen voices' highest rate, the trimmed silences, each language's rate,
-  pitch and volume, the full stops
-  next to numbers left without the add-on's spaces) is described in `README.md` and `setup\README.txt`.  If it was
-  asked for, say so: "(user request)".
+  pitch and volume, the full stops next to numbers left without the add-on's spaces, the symbols in a number left
+  unnamed, the spaces kept where the pauses between numbers go in) is described in `README.md` and
+  `setup\README.txt`.  If it was asked for, say so: "(user request)".
 
 ## Two READMEs
 
