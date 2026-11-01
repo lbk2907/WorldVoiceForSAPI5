@@ -205,12 +205,13 @@ static ScriptChoice g_scripts[] = {
     { IDC_DEVANAGARI, IDC_DEVANAGARI_L, "Devanagari", &wv::Settings::devanagariLanguage, {} },
 };
 
-// The number language, as WorldVoice offers it: the text's language, the main language, then the languages with a
-// voice (and the one chosen, if its voice has gone). What each item of the list stands for.
+// The number language: the main language first, as the default (user request, where the add-on has the text's language
+// first), the text's language, then the languages with a voice (and the one chosen, if its voice has gone). What each
+// item of the list stands for.
 static std::vector<std::wstring> g_numberChoices;
 
 static void FillNumberLanguages(HWND d, const wv::VoiceMap& map) {
-    g_numberChoices = { wv::kNumbersFollow, wv::kNumbersMain };
+    g_numberChoices = { wv::kNumbersMain, wv::kNumbersFollow };
     std::vector<std::wstring> langs(map.Languages().begin(), map.Languages().end());
     const std::wstring& chosen = g_settings.numberLanguage;
     if (chosen != wv::kNumbersFollow && chosen != wv::kNumbersMain && !map.Has(chosen)) langs.push_back(chosen);

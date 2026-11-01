@@ -6,8 +6,8 @@
 //   LatinLanguage      the language assumed for Latin characters when the text around them is not a Latin language
 //   HanLanguage        the same for CJK characters (Han): "zh", "ja" or "ko"
 //   ArabicLanguage, CyrillicLanguage, DevanagariLanguage   the same for those scripts
-//   NumberLanguage     "default" (the default: numbers follow the text around them), "main" (the main language), or a
-//                      language: WorldVoice's number language
+//   NumberLanguage     "main" (the default: the main language), "default" (numbers follow the text around them, the
+//                      add-on's name for its own default), or a language: WorldVoice's number language
 //   Voices\<language>  the voice for that language (a SAPI 5 voice token id); missing = none: WorldVoice does
 //                      not switch to that language. With no voice chosen at all, Windows' default voice reads
 //                      everything (see VoiceMap).
@@ -201,14 +201,15 @@ inline int ClampAdjustment(int v) { return v < -10 ? -10 : (v > 10 ? 10 : v); }
 inline int ClampFactor(DWORD v) { return v > 100 ? 100 : (int)v; }   // a wait factor, 0..100
 
 // The number languages that are not a language (the add-on's numberLanguage.py): numbers read in the language of the
-// text around them (the default), or in the main language (the language the program marks, or the main voice's).
+// text around them (the add-on's default), or in the main language (the language the program marks, or the main voice's;
+// the default here, user request).
 static const wchar_t* const kNumbersFollow = L"default";
 static const wchar_t* const kNumbersMain = L"main";
 
 struct Settings {
     std::wstring mainLanguage = L"en", latinLanguage = L"en", hanLanguage = L"zh", arabicLanguage = L"ar";
     std::wstring cyrillicLanguage = L"ru", devanagariLanguage = L"hi";
-    std::wstring numberLanguage = kNumbersFollow;    // number_language: kNumbersFollow, kNumbersMain or a language
+    std::wstring numberLanguage = kNumbersMain;      // number_language: kNumbersMain, kNumbersFollow or a language
     std::map<std::wstring, std::wstring> voices;     // language -> token id, or kNoVoice
     std::map<std::wstring, Adjustment> adjustments;  // language -> its adjustments
     // WorldVoice's number stages and punctuation pauses (its pipeline settings of the same names, version 7.0)

@@ -55,7 +55,7 @@ BEGIN
     COMBOBOX        IDC_CYRILLIC, 162, 112, 144, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Language assumed for Devana&gari characters:", IDC_DEVANAGARI_L, 12, 132, 148, 8
     COMBOBOX        IDC_DEVANAGARI, 162, 130, 144, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    // WorldVoice's number language: the language of the text around a number (the default), the main language, or
+    // WorldVoice's number language: the main language (the default), the language of the text around a number, or
     // a language of its own (those with a voice).
     LTEXT           "&Number language:", IDC_NUMLANG_L, 12, 150, 148, 8
     COMBOBOX        IDC_NUMLANG, 162, 148, 144, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP

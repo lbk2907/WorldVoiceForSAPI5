@@ -106,9 +106,10 @@ Each character's script (its writing system) decides its language:
 Also:
 
 - Spaces, punctuation and symbols stay with the text around them.
-- **Numbers** follow the Number language setting. With "Follow surrounding text language" (the default) a number is
-  read in the language of the text around it. With "Follow main language" it is read in the main language (or the
-  program's marked one), and with a language chosen, in that language. A number is its digits, of any script (also
+- **Numbers** follow the Number language setting. With "Follow main language" (the default here, user request; the
+  add-on's default is the other) a number is read in the main language (or the program's marked one). With "Follow
+  surrounding text language" it is read in the language of the text around it, and with a language chosen, in that
+  language. A number is its digits, of any script (also
   full-width digits such as "１２" and Arabic-Indic ones such as "١٢"), with any punctuation and symbols of Latin-1
   between them: "12,345", "5-3", "12:30" and "2×3" are one number each. A sign right after a letter or digit stays
   with the word, as the hyphen in "COVID-19"; after a space it belongs to the number, as in "-3". A number goes to
@@ -203,8 +204,8 @@ It has four tabs. Ctrl+Tab and Ctrl+Shift+Tab move between them.
   voice chosen, and is unavailable when there are none. The WorldVoice add-on offers Latin, CJK and Arabic; Cyrillic
   and Devanagari are added here, for the same reason. CJK characters are Chinese unless you choose otherwise, where
   the add-on assumes Japanese (user request).
-- **Number language**: the language numbers are read in: "Follow surrounding text language" (the default), "Follow
-  main language", or one of the languages that have a voice (see
+- **Number language**: the language numbers are read in: "Follow main language" (the default, user request), "Follow
+  surrounding text language", or one of the languages that have a voice (see
   [How WorldVoice splits a text](#how-worldvoice-splits-a-text)). It replaces WorldVoice's earlier "Ignore numbers
   when detecting text language", as in the add-on's version 7.0; the earlier setting is not carried over.
 
@@ -298,8 +299,8 @@ In `HKEY_CURRENT_USER\SOFTWARE\WorldVoice`:
 
 - `MainLanguage`, `LatinLanguage`, `HanLanguage`, `ArabicLanguage`, `CyrillicLanguage`, `DevanagariLanguage`:
   language codes such as `en`, `zh`, `ja` (defaults: `en`, `en`, `zh`, `ar`, `ru`, `hi`).
-- `NumberLanguage`: `default` (follow the surrounding text, the default), `main` (follow the main language), or a
-  language code such as `en`.
+- `NumberLanguage`: `main` (follow the main language, the default), `default` (follow the surrounding text; the name
+  is the add-on's, whose default it is), or a language code such as `en`.
 - `Voices\<language>`: the voice chosen for the language, as its SAPI 5 token, such as
   `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0`; no value means None.
 - `Adjustments\<language>`: DWORDs `Rate`, `Pitch` and `Volume`, -10 to 10.
