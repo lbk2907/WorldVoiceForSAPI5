@@ -16,8 +16,8 @@
 //   NumberMode         "none", "value" (the default), "number" (digit by digit) or "group" (GroupSize digits at a
 //                      time): WorldVoice's number mode
 //   GroupSize          DWORD 2..10 (default 3)
-//   GlobalWaitFactor   DWORD 0..100 in tens (default 10): each pause is its factor times this factor's tens, in ms
-//   NumberWaitFactor   DWORD 0..100 (default 10): the pause between numbers, and in Number and Group modes between
+//   GlobalWaitFactor   DWORD 0..100 in tens (default 0): each pause is its factor times this factor's tens, in ms
+//   NumberWaitFactor   DWORD 0..100 (default 0): the pause between numbers, and in Number and Group modes between
 //                      a number's pieces and around a number
 //   PunctuationPause   DWORD 1 (the default): pauses at punctuation, PunctuationWaitFactor long; 0: none
 //   PunctuationWaitFactor  DWORD 0..100 (default 0)
@@ -215,8 +215,8 @@ struct Settings {
     // WorldVoice's number stages and punctuation pauses (its pipeline settings of the same names, version 7.0)
     std::wstring numberMode = L"value";              // number_mode: none, value, number or group
     int groupSize = 3;                               // group_size, 2..10
-    int globalWaitFactor = 10;                       // global_wait_factor, 0..100 in tens
-    int numberWaitFactor = 10;                       // number_wait_factor, 0..100
+    int globalWaitFactor = 0;                        // global_wait_factor, 0..100 in tens (the add-on's default: 10)
+    int numberWaitFactor = 0;                        // number_wait_factor, 0..100 (the add-on's default: 10)
     bool punctuationPause = true;                    // punctuation_pause_enabled
     int punctuationWaitFactor = 0;                   // punctuation_wait_factor, 0..100
     bool removePunctuation = false;                  // remove_punctuation_characters

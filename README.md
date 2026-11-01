@@ -131,9 +131,11 @@ switches.
 Before the text is split by language, WorldVoice does what the add-on (version 7.0) does with numbers and punctuation
 (the settings are on the configuration program's [Numbers and punctuation tab](#numbers-and-punctuation-tab)).
 
-**Pauses.** Each pause is its wait factor times the global wait factor's tens, in milliseconds: at the global wait
-factor's default, 10 (shown as 1), a wait factor of 15 is a 15 ms pause; at 30 (shown as 3), it is 45 ms. There is no
-upper limit. With a global wait factor of 0 every pause is 0 ms, which still parts the text there.
+**Pauses.** Each pause is its wait factor times the global wait factor's tens, in milliseconds: at a global wait
+factor of 10 (shown as 1), a wait factor of 15 is a 15 ms pause; at 30 (shown as 3), it is 45 ms. There is no upper
+limit. With a global wait factor of 0 every pause is 0 ms, which still parts the text there. All the wait factors
+start at 0 here (user request), so there are no pauses until you set them; the add-on starts its global and number
+wait factors at 10.
 
 **Number mode:**
 
@@ -227,11 +229,11 @@ It has four tabs. Ctrl+Tab and Ctrl+Shift+Tab move between them.
 The add-on's settings of the same names (see [Numbers and punctuation](#numbers-and-punctuation)). Beside each slider
 is what it gives.
 
-- **Global wait factor**: from 0 to 10 (1, the default); every pause below is its own wait factor times this, in ms.
+- **Global wait factor**: from 0 to 10 (0, the default, user request); every pause below is its own wait factor times this, in ms.
   The add-on's Speech Pipeline panel shows it the same way (it keeps it as 0 to 100, in tens).
 - **Number mode**: Off, Value (the default), Number (digit by digit) or Group (digits in groups).
 - **Group size**: in Group mode, the digits in a group, from 2 to 10 (3, the default). Unavailable in the other modes.
-- **Number wait factor**: from 0 to 100 (10, the default): the pause between numbers, and in Number and Group modes
+- **Number wait factor**: from 0 to 100 (0, the default, user request): the pause between numbers, and in Number and Group modes
   between a number's pieces and around a number.
 - **Enable punctuation pause control**: ticked by default. Untick it for no pauses at punctuation and no marks left
   out.
@@ -304,10 +306,10 @@ In `HKEY_CURRENT_USER\SOFTWARE\WorldVoice`:
 - `Voices\<language>`: the voice chosen for the language, as its SAPI 5 token, such as
   `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0`; no value means None.
 - `Adjustments\<language>`: DWORDs `Rate`, `Pitch` and `Volume`, -10 to 10.
-- `GlobalWaitFactor`: DWORD, 0 to 100 in tens (default 10); other values are rounded down to tens.
+- `GlobalWaitFactor`: DWORD, 0 to 100 in tens (default 0); other values are rounded down to tens.
 - `NumberMode`: `none`, `value` (the default), `number` or `group`; any other value reads as `value`.
 - `GroupSize`: DWORD, 2 to 10 (default 3); any other value reads as 3.
-- `NumberWaitFactor`: DWORD, 0 to 100 (default 10).
+- `NumberWaitFactor`: DWORD, 0 to 100 (default 0).
 - `PunctuationWaitFactor`: DWORD, 0 to 100 (default 0).
 - `PunctuationPause`, `RemovePunctuation`: DWORDs, 1 when "Enable punctuation pause control" (the default) or "Remove
   configured punctuation at pause points" is ticked.
