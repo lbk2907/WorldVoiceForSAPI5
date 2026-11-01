@@ -195,6 +195,12 @@ Voices begin and end what they say with silence, as if each piece were a whole t
 does not pause, the silence at the start of a piece is cut to 20 ms, and at its end, when another piece follows, to a
 natural pause: 250 ms after the end of a sentence, 150 ms after a comma, colon or semicolon, 80 ms otherwise, with
 any silence asked for there (by the program, or a pause at punctuation) on top. Silence inside a piece is kept.
+Every chosen voice is loaded when the program loads WorldVoice. A voice chosen after that starts loading with the
+next thing the program says, usually the name of the voice just chosen, so that the first text in its language does
+not wait for it (user request): a Vocalizer voice of 14 MB not read lately took some 700 ms. A voice that loads
+inside the program rather than in a helper of its own holds that one speech up while it loads (Cerence's and
+Eloquence's took up to half a second the first time, under 100 ms after that). A voice no longer chosen is let go,
+with its memory and any helpers, so going through the list of voices does not leave them all loaded.
 Each piece goes to its voice marked with its language (the voice's own locale of it, such as English (United
 Kingdom) for a British voice), so a voice that speaks several languages reads each piece in the right one.
 Word positions and bookmarks refer to the program's own text, so following the text as it is read works as with any

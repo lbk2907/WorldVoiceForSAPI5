@@ -502,6 +502,7 @@ private:
     void Refresh(wv::Settings& settings, wv::VoiceMap& map);
     DWORD OutRate();
     SubVoice* Voice(const std::wstring& id);
+    void KeepChosenVoices(const wv::VoiceMap& map);
     std::shared_ptr<const wv::ResampleFilter> FilterFrom(DWORD rate);
     void Split(const wv::Detector& detector, const std::wstring& base, const SPVTEXTFRAG* frags, const std::vector<bool>& inNumber, std::vector<Piece>& pieces);
 
@@ -561,17 +562,34 @@ SubVoice* WorldVoiceEngine::Voice(const std::wstring& id) {
     if (id.empty()) return nullptr;
     auto it = m_subs.find(id);
     if (it != m_subs.end()) return it->second.get();
+    ULONGLONG start = GetTickCount64();
     std::unique_ptr<SubVoice> v(new (std::nothrow) SubVoice());
     HRESULT hr = v ? v->Create(id) : E_OUTOFMEMORY;
     if (FAILED(hr)) {
         Log("voice %s could not be loaded: 0x%08lx", Utf8(id).c_str(), hr);
         v.reset();
     } else {
-        Log("voice %s loaded", Utf8(id).c_str());
+        Log("voice %s loaded in %llu ms", Utf8(id).c_str(), GetTickCount64() - start);
     }
     SubVoice* p = v.get();
     m_subs[id] = std::move(v);
     return p;
+}
+
+// The chosen voices loaded, and no others, each time the program speaks (user request, 2026-11-02). A voice chosen while
+// the program has WorldVoice loaded would otherwise load when its language first came up, and that text would wait for
+// it: some 700 ms for a Vocalizer voice of 14 MB not read lately. Now it starts on the speech that follows the choice,
+// usually the program saying what was chosen. A voice let go frees its memory and any helpers, or stepping through the
+// list of voices would leave every one of them loaded.
+void WorldVoiceEngine::KeepChosenVoices(const wv::VoiceMap& map) {
+    std::set<std::wstring> chosen;
+    for (const std::wstring& lang : map.Languages()) chosen.insert(map.VoiceFor(lang));
+    for (auto it = m_subs.begin(); it != m_subs.end();) {
+        if (chosen.count(it->first)) { ++it; continue; }
+        Log("voice %s let go: no longer chosen", Utf8(it->first).c_str());
+        it = m_subs.erase(it);
+    }
+    for (const std::wstring& id : chosen) Voice(id);
 }
 
 // Splits the text into pieces by language, as WorldVoice's add_detected_language_commands (and, for spelled
@@ -702,6 +720,7 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
     if (base.empty()) { Log("speak: no voices installed"); return S_OK; }
     // The format SAPI asks for is the one GetOutputFormat gave.
     WAVEFORMATEX out = Pcm16Mono(OutRate());
+    KeepChosenVoices(map);
     if (format && !SameFormat(*format, out))
         Log("speak: asked for %lu Hz, %u bit, %u channel(s); writing %lu Hz 16-bit mono", format->nSamplesPerSec, format->wBitsPerSample, format->nChannels, out.nSamplesPerSec);
 

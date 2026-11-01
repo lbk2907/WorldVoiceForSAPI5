@@ -84,6 +84,10 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   when they load the voice.  Do not make it follow the voice that is reading, and never convert a voice down: the
   user wants every voice at its own quality (user request, 2026-10-31; before that it was always 44100 Hz, which
   made NVDA's cut at an interrupt click with Eloquence at 11025 Hz).
+* **Voices are loaded on the thread that speaks.**  `KeepChosenVoices` loads a newly chosen voice at the start of
+  `Speak`, not on a thread of its own, though a voice that loads slowly then holds that one speech up: WorldVoice works
+  with any voice, and a voice may tie itself to the thread it was made on (a hidden window, say).  It also lets go of
+  voices no longer chosen, which only `Speak` can do safely, as no voice is speaking then.
 
 ## Testing
 
