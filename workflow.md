@@ -11,8 +11,9 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   `_language_for_character`, `add_detected_language_commands` and `process_for_spelling`), with its number language
   (`detect_with_number_language`, `_split_numbers_for_language`) done in the split in `sapi\WorldVoiceSapi.cpp`.
   The number stages and the pauses at punctuation in `sapi\Pipeline.h` are the same kind of port of the same
-  version's speech pipeline (`remove_thousands_separators`, `inject_numbers`, `inject_punctuation_pause` and
-  `number_wait_factor`, in that order), and run before the split, as the add-on runs them before its detection.  A
+  version's speech pipeline, with its later number changes up to commit `a2a8e22` (`remove_thousands_separators`,
+  `inject_numbers`, `inject_punctuation_pause` and `number_wait_factor`, in that order), and run before the split, as
+  the add-on runs them before its detection.  A
   text split or changed differently from the add-on is a bug, unless somebody asked for the difference.
 * **SAPI's fragments are the add-on's speech sequence.**  `Pipeline.h` takes the text of fragments in a row with the
   same state as one string (NVDA's SAPI 5 driver writes the strings between two commands as one text), a silence as a
@@ -20,7 +21,9 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   other change of state between two texts, as another command.  A number language's switches, which the add-on puts
   in before its other stages (`inject_numbers`), are language commands there too, and the fragments between them are
   marked for the split, which reads them in the number language.  Keep that mapping when porting more of the
-  pipeline, and keep every piece of text pointing into the program's own text, so word positions stay right.
+  pipeline, and keep every piece of text pointing into the program's own text, so word positions stay right.  The
+  spaces Number mode reads digits with are the one exception, as they are not in that text: each is a fragment of its
+  own, at the place of the digit after it.
 * **Work from the add-on's code, not from memory.**  Read the add-on's function while porting or changing its C++
   counterpart.  The add-on is at <https://github.com/tsengwoody/WorldVoice>, and on a computer with it installed in
   `%APPDATA%\nvda\addons\WorldVoice\synthDrivers\WorldVoice`.

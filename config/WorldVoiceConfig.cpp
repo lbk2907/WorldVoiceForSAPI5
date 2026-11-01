@@ -45,7 +45,7 @@ static void Save() {
     auto setDword = [](const wchar_t* name, DWORD v) { RegSetKeyValueW(HKEY_CURRENT_USER, wv::kSettingsKey, name, REG_DWORD, &v, sizeof(v)); };
     SetString(L"NumberLanguage", g_settings.numberLanguage);
     SetString(L"NumberMode", g_settings.numberMode);
-    setDword(L"GroupSize", (DWORD)g_settings.groupSize);
+    setDword(L"NumberGroupSize", (DWORD)g_settings.groupSize);
     setDword(L"NumberWaitFactor", (DWORD)g_settings.numberWaitFactor);
     setDword(L"PunctuationPause", g_settings.punctuationPause ? 1 : 0);
     setDword(L"PunctuationWaitFactor", (DWORD)g_settings.punctuationWaitFactor);
@@ -229,17 +229,15 @@ static void FillNumberLanguages(HWND d, const wv::VoiceMap& map) {
 // ---- Numbers and punctuation tab ----
 
 // WorldVoice's number modes, in its order.
-static const wchar_t* const kNumberModes[] = { L"none", L"value", L"number", L"group" };
-static const wchar_t* const kNumberModeNames[] = { L"Off", L"Value", L"Number (digit by digit)", L"Group (digits in groups)" };
+static const wchar_t* const kNumberModes[] = { L"none", L"value", L"number" };
+static const wchar_t* const kNumberModeNames[] = { L"Off", L"Value", L"Number (digit by digit)" };
 
 // A wait factor as shown: it is its pause, in ms.
 static std::wstring WaitText(int factor) { return std::to_wstring(factor) + L" ms"; }
 
-// As in WorldVoice: the group size only in group mode; the removal, the punctuation wait factor and the characters
-// only with the pauses on.
+// As in WorldVoice: the removal, the punctuation wait factor and the characters only with the pauses on.
 static void EnableNumbersAndPunctuation(HWND d) {
-    bool group = g_settings.numberMode == L"group", pause = g_settings.punctuationPause;
-    for (int id : { IDC_GROUPSIZE, IDC_GROUPSIZE_L, IDC_GROUPSIZE_SPIN }) EnableWindow(GetDlgItem(d, id), group);
+    bool pause = g_settings.punctuationPause;
     for (int id : { IDC_PUNCTREMOVE, IDC_PUNCTWAIT, IDC_PUNCTWAIT_L, IDC_PUNCTWAIT_V, IDC_PUNCTCHARS, IDC_PUNCTCHARS_L })
         EnableWindow(GetDlgItem(d, id), pause);
 }
@@ -458,8 +456,8 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             SendDlgItemMessageW(d, id, TBM_SETLINESIZE, 0, 10);
             SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 100);
         }
-        SendDlgItemMessageW(d, IDC_GROUPSIZE_SPIN, UDM_SETRANGE32, 2, 10);
-        SendDlgItemMessageW(d, IDC_GROUPSIZE, EM_LIMITTEXT, 2, 0);
+        SendDlgItemMessageW(d, IDC_GROUPSIZE_SPIN, UDM_SETRANGE32, 0, 2147483647);
+        SendDlgItemMessageW(d, IDC_GROUPSIZE, EM_LIMITTEXT, 10, 0);
         SendDlgItemMessageW(d, IDC_PUNCTCHARS, EM_LIMITTEXT, 200, 0);
         Fill(d);
         ShowPage(d, 0);
@@ -523,14 +521,14 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_NUMMODE:
             if (HIWORD(wp) == CBN_SELCHANGE) {
                 int item = (int)SendDlgItemMessageW(d, IDC_NUMMODE, CB_GETCURSEL, 0, 0);
-                if (item >= 0 && item < ARRAYSIZE(kNumberModes)) { g_settings.numberMode = kNumberModes[item]; Save(); EnableNumbersAndPunctuation(d); }
+                if (item >= 0 && item < ARRAYSIZE(kNumberModes)) { g_settings.numberMode = kNumberModes[item]; Save(); }
             }
             break;
         case IDC_GROUPSIZE:
-            if (HIWORD(wp) == EN_CHANGE) {          // saved once it is a size WorldVoice takes, 2 to 10
+            if (HIWORD(wp) == EN_CHANGE) {          // saved once it is a size WorldVoice takes, 0 to 2147483647
                 BOOL ok = FALSE;
                 UINT size = GetDlgItemInt(d, IDC_GROUPSIZE, &ok, FALSE);
-                if (ok && size >= 2 && size <= 10 && (int)size != g_settings.groupSize) { g_settings.groupSize = (int)size; Save(); }
+                if (ok && size <= 2147483647 && (int)size != g_settings.groupSize) { g_settings.groupSize = (int)size; Save(); }
             }
             break;
         case IDC_PUNCTPAUSE:

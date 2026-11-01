@@ -128,8 +128,9 @@ switches.
 
 ## Numbers and punctuation
 
-Before the text is split by language, WorldVoice does what the add-on (version 7.0) does with numbers and punctuation
-(the settings are on the configuration program's [Numbers and punctuation tab](#numbers-and-punctuation-tab)).
+Before the text is split by language, WorldVoice does what the add-on (version 7.0, and its later number changes) does
+with numbers and punctuation (the settings are on the configuration program's
+[Numbers and punctuation tab](#numbers-and-punctuation-tab)).
 
 **Pauses.** Each pause is its own wait factor, in milliseconds, from 0 to 1000: a number wait factor of 150 is a 150 ms
 pause, whatever the punctuation wait factor is. A wait factor of 0 is a pause of 0 ms, which still parts the text
@@ -143,14 +144,21 @@ only multiply them, so it is left out (user request).
 - **Value** (the default): numbers as they are written, for the voice to read its own way, but without the commas of
   a number written with thousands separators: "12,345,678" goes to the voice as "12345678". Only commas that make
   whole groups of three count: "1,234,5" and "a,1,234" stay as they are.
-- **Number**: digit by digit, "12345" as "1 2 3 4 5".
-- **Group**: the digits in groups from the left, of the group size (3 unless you change it): "12345" as "123 45".
+- **Number**: digit by digit, "12345" as "1 2 3 4 5" and "-123" as "-1 2 3". A symbol inside a number is read apart
+  too ("12:30" as "1 2 : 3 0"). The voice gets all of it as one text, with no pauses between the digits.
 
-In Number and Group modes a sign goes with the first digit or group ("-1234" as "-1 2 3 4"), each symbol inside a
-number is a piece of its own ("12:30" as "1 2 : 3 0"), and between every two pieces goes the number pause, even one of
-0 ms, so that the voice reads each piece on its own. When the number pause is above 0, it also comes before and after
-a number with text next to it, and in place of the spaces between two numbers; where it meets another pause (one the
-program asks for, or a pause at punctuation), only the longest stays.
+**Group size**, in every mode: 0 (the default) leaves a number whole. Above 0, a number is cut from the left into
+pieces of that many digits: with 3, "12345" reads as "123 45", or in Number mode as "1 2 3" and "4 5". A sign goes with
+the first piece ("-1234" with 2 as "-12 34"), each symbol inside a number is a piece of its own, and between every two
+pieces goes the number pause, even one of 0 ms, so that the voice reads each piece on its own.
+
+With a number pause above 0, it also goes:
+
+- with a group size, before and after a number with text next to it, and in place of the spaces between two numbers;
+- in Number mode without a group size, only where two numbers would run together: in place of the spaces between them,
+  and between a number that ends a text the program sends and one that starts the next.
+
+Where it meets another pause (one the program asks for, or a pause at punctuation), only the longest stays.
 
 - The add-on reads a symbol inside a number by its name, from NVDA's symbol tables ("12:30" as "1 2 colon 3 0"). A
   SAPI 5 voice has no such tables, so WorldVoice leaves the symbol for the voice to read, as the add-on does with a
@@ -176,20 +184,25 @@ default, 0, gives a pause of 0 ms, which still parts the text there.
   language's (or the program's marked one's), the switch to a number counts as such a change: a mark right before the
   number gets no pause, as in the add-on.
 - Where the program already asks for a silence after a text, its silence takes the place of the pause at the text's
-  end: they do not add up. Next to a number's pause in Number and Group modes, only the longer one stays.
+  end: they do not add up. Next to a pause before or after a number, only the longer one stays.
 
 **Removing the marks.** With "Remove configured punctuation at pause points" ticked, the marks at those pause points
 are left out of the text, so the voice neither reads them nor pauses on its own there. A mark at the very end stays. A
 mark where the program asks for a silence is still left out. Where leaving out a mark empties what was between two
-number pauses ("3.5" in Number mode, with the full stop among the characters), only one of the two pauses stays.
+number pauses ("3.5" with a group size, with the full stop among the characters), only one of the two pauses stays.
 
 WorldVoice gets the text after the program has made it ready: a mark a screen reader reads out as a word (NVDA at
 punctuation level "all") arrives as that word, and is not a mark any more. Spelled text is left as it is.
 
 Before the add-on's version 7.0, WorldVoice for SAPI 5 followed the add-on's master branch after version 6.2. Its Pair
-mode and pair wait factor are gone: Group mode with a group size of 2 reads the digits in pairs. A punctuation wait
+mode and pair wait factor are gone: a group size of 2 reads the digits in pairs. A punctuation wait
 factor set then now gives a shorter pause (it was 5 ms a step, at most 500 ms), and the punctuation pause characters,
 which were the common marks unless you changed them, are now none unless you type them.
+
+The add-on has since dropped its Group mode, as the group size now works in every mode: a Group mode saved earlier reads
+as Value, with no groups until you set a group size. The configuration program used to save a group size of 3 for
+everybody who changed any setting, where the add-on saves only what you change, so the setting has a new name here
+(`NumberGroupSize`) and the old `GroupSize` is no longer read.
 
 ## The configuration program
 
@@ -229,9 +242,9 @@ It has four tabs. Ctrl+Tab and Ctrl+Shift+Tab move between them.
 The add-on's settings of the same names (see [Numbers and punctuation](#numbers-and-punctuation)). Beside each slider
 is what it gives.
 
-- **Number mode**: Off, Value (the default), Number (digit by digit) or Group (digits in groups).
-- **Group size**: in Group mode, the digits in a group, from 2 to 10 (3, the default). Unavailable in the other modes.
-- **Number wait factor**: from 0 to 1000 ms, moving by 10 ms (0, the default, user request): the pause between numbers, and in Number and Group modes
+- **Number mode**: Off, Value (the default) or Number (digit by digit).
+- **Group size**: in every mode, the digits in each piece of a number, from 0 up; 0 (the default) leaves numbers whole.
+- **Number wait factor**: from 0 to 1000 ms, moving by 10 ms (0, the default, user request): the pause between numbers, and with a group size
   between a number's pieces and around a number.
 - **Enable punctuation pause control**: ticked by default. Untick it for no pauses at punctuation and no marks left
   out.
@@ -304,8 +317,8 @@ In `HKEY_CURRENT_USER\SOFTWARE\WorldVoice`:
 - `Voices\<language>`: the voice chosen for the language, as its SAPI 5 token, such as
   `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0`; no value means None.
 - `Adjustments\<language>`: DWORDs `Rate`, `Pitch` and `Volume`, -10 to 10.
-- `NumberMode`: `none`, `value` (the default), `number` or `group`; any other value reads as `value`.
-- `GroupSize`: DWORD, 2 to 10 (default 3); any other value reads as 3.
+- `NumberMode`: `none`, `value` (the default) or `number`; any other value reads as `value`.
+- `NumberGroupSize`: DWORD, 0 to 2147483647 (default 0); any other value reads as 0.
 - `NumberWaitFactor`: DWORD, the pause in ms, 0 to 1000 (default 0).
 - `PunctuationWaitFactor`: DWORD, the pause in ms, 0 to 1000 (default 0).
 - `PunctuationPause`, `RemovePunctuation`: DWORDs, 1 when "Enable punctuation pause control" (the default) or "Remove

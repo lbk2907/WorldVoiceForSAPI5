@@ -1,8 +1,9 @@
 // Pipeline.h - WorldVoice's number stages and punctuation pauses, done on SAPI's text fragments before the text is split
 // by language, as the add-on does them before its language detection. A rule-for-rule port of the add-on's pipeline,
-// version 7.0, in its order: remove_thousands_separators, inject_numbers (_number_item_segments, _translate_number and
-// numbers.number_pieces), inject_punctuation_pause and number_wait_factor, each with _merge_edge_breaks where the
-// add-on has it. The number language, the other half of inject_numbers, is read in the split (WorldVoiceSapi.cpp),
+// version 7.0 and its number changes after that (to commit a2a8e22, where the group size came apart from the number
+// mode), in its order: remove_thousands_separators, inject_numbers (_number_item_segments, _translate_number and
+// numbers.group_pieces and render_piece), inject_punctuation_pause and number_wait_factor, each with _merge_edge_breaks
+// where the add-on has it. The number language, the other half of inject_numbers, is read in the split (WorldVoiceSapi.cpp),
 // where the add-on's detection does it; but a number language that is a language also puts its switches around each
 // number here, where they change the voice, as inject_numbers does, because the stages after it see them as commands
 // (no punctuation pause before a number read by another voice, for one). The add-on's other pauses (between items, in
@@ -15,16 +16,18 @@
 // between two texts of different states (a language change alone is NVDA's LangChangeCommand, which the pause
 // between numbers looks through). What comes out is fragments again, each still pointing into the program's
 // own text with its own position in it, so word positions stay right; a pause is a silence fragment, also one of 0 ms
-// (the add-on's 0 ms break still keeps the text on its two sides apart). Spelled text is left as it is: NVDA spells
-// punctuation by name.
+// (the add-on's 0 ms break still keeps the text on its two sides apart). The spaces Number mode reads digits with are
+// not in the program's text: each is a fragment of its own, at the place of the digit after it. Spelled text is left as
+// it is: NVDA spells punctuation by name.
 //
 // Where it does not do what the add-on does (both READMEs say so):
 // - inject_numbers' dot rule, a full stop right before or after a number set apart with a space ("2.54.2" read as
 //   "2.54 . 2"), is left out (user request, 2026-10-13).
 // - number_wait_factor strips the spaces from both ends of every text and drops blank texts (_remove_space). Here the
 //   texts keep their spaces, as SAPI joins the fragments a voice gets; only its pauses are put in.
-// - In Number and Group modes a symbol inside a number ("12:30") is spoken as itself: the add-on names it from NVDA's
-//   symbol tables (symbols.symbol_namer), which a SAPI voice does not have; it does the same where NVDA has no name.
+// - A symbol inside a number ("12:30"), in Number mode or as a piece of its own with a group size, is spoken as itself:
+//   the add-on names it from NVDA's symbol tables (symbols.symbol_namer), which a SAPI voice does not have; it does the
+//   same where NVDA has no name.
 #pragma once
 #include <sapi.h>
 #include <sapiddk.h>
@@ -83,8 +86,9 @@ public:
     }
 
 private:
-    // Where a character of a text comes from: SAPI's fragment and its place in it.
-    struct Src { const SPVTEXTFRAG* frag; ULONG pos; };
+    // Where a character of a text comes from: SAPI's fragment and its place in it. A space put in (Render) has the
+    // place of the character after it, and is not in the program's text.
+    struct Src { const SPVTEXTFRAG* frag; ULONG pos; bool added = false; };
     // The add-on's kinds of pause: a BreakCommand of the program's, NumberBreakCommand, NumberEdgeBreakCommand,
     // NumberItemEdgeBreakCommand and PunctuationBreakCommand.
     enum class Pause { Plain, Number, NumberEdge, NumberItemEdge, Punctuation };
@@ -116,6 +120,11 @@ private:
     static bool IsSpaces(const std::wstring& t, size_t a, size_t b) { return b > a && IsBlank(t, a, b); }
     static bool Spoken(const Item& item) {                   // a text with more than spaces (_is_spoken)
         return (item.kind == Item::Text || item.kind == Item::Spelled) && !IsBlank(item.text, 0, item.text.size());
+    }
+    // The first spoken part of the text is a number (_spoken_kinds(text)[:1] == ["number"]).
+    static bool StartsWithNumber(const Item& item) {
+        std::vector<std::pair<size_t, size_t>> numbers = NumbersForLanguage(item.text.c_str(), item.text.size());
+        return !numbers.empty() && IsBlank(item.text, 0, numbers[0].first);
     }
     static bool IsEdge(const Item& item) {
         return item.kind == Item::Break && (item.pause == Pause::NumberEdge || item.pause == Pause::NumberItemEdge);
@@ -259,14 +268,18 @@ private:
 
     // inject_numbers, item by item (_inject_item_numbers), then _merge_edge_breaks where it has edge breaks.
     void InjectNumbers(const std::vector<Item>& items, std::vector<Item>& out) {
-        if (m_mode == L"none" && m_numberLanguage.empty()) { out = items; return; }
-        // In Number and Group modes the number pause also goes before and after a number; a pause of 0 adds none.
-        bool edges = (m_mode == L"number" || m_mode == L"group") && m_numberMs > 0;
+        if (m_mode == L"none" && m_group == 0 && m_numberLanguage.empty()) { out = items; return; }
+        // With a group size above 0, whatever the mode, the number pause also goes before and after a number. Without
+        // groups, Number mode has no such pause, but puts one where two numbers would run together: in place of the
+        // spaces between them, and between a number that ends a text and one that starts the next. A pause of 0 adds none.
+        bool edges = m_group > 0 && m_numberMs > 0;
+        bool numbersOnly = !edges && m_mode == L"number" && m_numberMs > 0;
+        bool gaps = edges || numbersOnly;
         std::vector<bool> spokenAfter(items.size(), false);
         bool spoken = false;
         for (size_t i = items.size(); i-- > 0;) {        // _spoken_later: one utterance (SAPI has no end of utterance)
             spokenAfter[i] = spoken;
-            spoken = spoken || Spoken(items[i]);
+            if (Spoken(items[i])) spoken = !numbersOnly || StartsWithNumber(items[i]);
         }
         bool spokenBefore = false;
         for (size_t i = 0; i < items.size(); i++) {
@@ -276,18 +289,18 @@ private:
                 spokenBefore = spokenBefore || Spoken(item);
                 continue;
             }
-            NumberItem(item, edges, edges && spokenBefore, edges && spokenAfter[i], out);
+            NumberItem(item, edges, gaps, edges && spokenBefore, gaps && spokenAfter[i], out);
             spokenBefore = spokenBefore || Spoken(item);
         }
-        if (edges) MergeEdgeBreaks(out);
+        if (gaps) MergeEdgeBreaks(out);
     }
 
     // _number_item_segments: the item's text, and each number with its pauses, its number language's switches and its
-    // pieces. Text parts and numbers alternate; whitespace between two numbers becomes the pause between them; an item
-    // that a number begins (or ends), with spoken text before (or after) the item, gets an item edge pause there. The
-    // switches are there only where the number language's voice is not that of the language in force
+    // pieces. Text parts and numbers alternate; with gaps, whitespace between two numbers becomes the pause between them;
+    // an item that a number begins (or ends), with spoken text before (or after) the item, gets an item edge pause there.
+    // The switches are there only where the number language's voice is not that of the language in force
     // (deduplicate_language_command), and then around every number of the item.
-    void NumberItem(const Item& in, bool edges, bool edgeBefore, bool edgeAfter, std::vector<Item>& out) {
+    void NumberItem(const Item& in, bool edges, bool gaps, bool edgeBefore, bool edgeAfter, std::vector<Item>& out) {
         const std::wstring& t = in.text;
         size_t n = t.size();
         std::vector<std::pair<size_t, size_t>> numbers = NumbersForLanguage(t.c_str(), n);
@@ -311,7 +324,7 @@ private:
         for (size_t k = 0; k < parts.size(); k++) {
             const Part& p = parts[k];
             if (!p.number) {
-                if (edges && k > 0 && k < last && IsSpaces(t, p.a, p.b)) { PutPause(cur, in, p.a, m_numberMs, Pause::Number, out); continue; }
+                if (gaps && k > 0 && k < last && IsSpaces(t, p.a, p.b)) { PutPause(cur, in, p.a, m_numberMs, Pause::Number, out); continue; }
                 Put(cur, in, p.a, p.b);        // (the dot rule is left out, see above)
                 continue;
             }
@@ -339,14 +352,14 @@ private:
         out.push_back(c);
     }
 
-    // _translate_number with numbers.number_pieces: value mode keeps the number whole; number and group modes cut each
-    // digit run from the left into pieces of 1 or GroupSize digits (a leading sign joins the first) and make each
-    // symbol a piece of its own (NUMBER_TOKEN_RE = ^[+-]?\d+|\d+|[symbols]), with a number pause between every two
-    // pieces, even one of 0 ms, so each reaches the voice on its own.
+    // _translate_number with numbers.group_pieces: with a group size of 0 the number is one piece; above 0, whatever the
+    // mode, each digit run is cut from the left into pieces of that many digits (a leading sign joins the first) and
+    // each symbol is a piece of its own (NUMBER_TOKEN_RE = ^[+-]?\d+|\d+|[symbols]), with a number pause between every
+    // two pieces, even one of 0 ms, so each reaches the voice on its own.
     void Translate(Item& cur, const Item& in, size_t a, size_t b, std::vector<Item>& out) {
-        if (m_mode != L"number" && m_mode != L"group") { Put(cur, in, a, b); return; }
+        if (m_group == 0) { Render(cur, in, a, b); return; }
         const std::wstring& t = in.text;
-        size_t size = m_mode == L"number" ? 1 : m_group, u = 1;
+        size_t u = 1;
         std::vector<std::pair<size_t, size_t>> pieces;
         size_t k = a;
         while (k < b) {
@@ -357,7 +370,7 @@ private:
                 size_t count = 0, groupStart = start;
                 while (k < b && IsDecimal(CodePointAt(t.c_str(), b, k, &u))) {
                     k += u;
-                    if (++count == size) { pieces.push_back({ groupStart, k }); groupStart = k; count = 0; }
+                    if (++count == m_group) { pieces.push_back({ groupStart, k }); groupStart = k; count = 0; }
                 }
                 if (count) pieces.push_back({ groupStart, k });
                 continue;
@@ -368,7 +381,26 @@ private:
         }
         for (size_t i = 0; i < pieces.size(); i++) {
             if (i) PutPause(cur, in, pieces[i].first, m_numberMs, Pause::Number, out);
-            Put(cur, in, pieces[i].first, pieces[i].second);
+            Render(cur, in, pieces[i].first, pieces[i].second);
+        }
+    }
+
+    // numbers.render_piece: Number mode reads every digit and symbol apart, with single spaces, a leading sign staying
+    // on the first digit: "-123" as "-1 2 3", "12:30" as "1 2 : 3 0". The other modes leave a piece as it is written.
+    void Render(Item& cur, const Item& in, size_t a, size_t b) {
+        if (m_mode != L"number") { Put(cur, in, a, b); return; }
+        const std::wstring& t = in.text;
+        size_t k = a, u = 1;
+        bool sign = (t[a] == L'+' || t[a] == L'-') && a + 1 < b && IsDecimal(CodePointAt(t.c_str(), b, a + 1, &u));
+        while (k < b) {
+            CodePointAt(t.c_str(), b, k, &u);
+            if (k > a && !(sign && k == a + 1)) {
+                cur.text += L' ';
+                cur.src.push_back({ in.src[k].frag, in.src[k].pos, true });
+                m_changed = true;
+            }
+            Put(cur, in, k, k + u);
+            k += u;
         }
     }
 
@@ -501,11 +533,12 @@ private:
     // whitespace separates inside one text, which become texts of their own without that whitespace
     // (split_spaced_numbers). Language changes and blank texts (which the add-on drops) do not count, and the pause goes
     // after the first language change between the two (_insert_number_breaks); any other command keeps the numbers
-    // apart, a pause too.
+    // apart, a pause too. Number mode keeps its texts whole: the spaces in them join the digits of one piece, and
+    // inject_numbers has already put a pause wherever only whitespace separated two numbers.
     void NumberWait(const std::vector<Item>& items, std::vector<Item>& out) {
         std::vector<Item> split;
         for (const Item& item : items) {
-            if (item.kind == Item::Text) SplitSpaced(item, split);
+            if (item.kind == Item::Text && m_mode != L"number") SplitSpaced(item, split);
             else split.push_back(item);
         }
         size_t previous = SIZE_MAX, after = 0;      // the item before in out, and where the items after it start
@@ -558,8 +591,17 @@ private:
                 const Src& s = item.src[i];
                 SPVTEXTFRAG f = *s.frag;
                 f.pNext = nullptr;
+                if (s.added) {                     // a space put in: its text is not the program's
+                    static const wchar_t space[] = L" ";
+                    f.pTextStart = space;
+                    f.ulTextLen = 1;
+                    f.ulTextSrcOffset = s.frag->ulTextSrcOffset + s.pos;
+                    out.push_back(f);
+                    i++;
+                    continue;
+                }
                 size_t j = i + 1;
-                while (j < item.src.size() && item.src[j].frag == s.frag && item.src[j].pos == item.src[j - 1].pos + 1) j++;
+                while (j < item.src.size() && !item.src[j].added && item.src[j].frag == s.frag && item.src[j].pos == item.src[j - 1].pos + 1) j++;
                 f.pTextStart = s.frag->pTextStart + s.pos;
                 f.ulTextLen = (ULONG)(j - i);
                 f.ulTextSrcOffset = s.frag->ulTextSrcOffset + s.pos;

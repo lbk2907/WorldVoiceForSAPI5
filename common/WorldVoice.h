@@ -13,11 +13,12 @@
 //                      everything (see VoiceMap).
 //   Adjustments\<language>  DWORDs Rate, Pitch, Volume, each -10..10, 0 = as the speaking program asks: rate and
 //                      pitch in SAPI's steps, added to the program's; volume 10% per step
-//   NumberMode         "none", "value" (the default), "number" (digit by digit) or "group" (GroupSize digits at a
-//                      time): WorldVoice's number mode
-//   GroupSize          DWORD 2..10 (default 3)
-//   NumberWaitFactor   DWORD 0..1000 (default 0): the pause in ms between numbers, and in Number and Group modes
-//                      between a number's pieces and around a number
+//   NumberMode         "none", "value" (the default) or "number" (digit by digit): WorldVoice's number mode
+//   NumberGroupSize    DWORD 0..2147483647 (default 0, no groups): cuts numbers into pieces of that many digits, in
+//                      every number mode. Not the old GroupSize, which the settings program saved as 3 for everyone
+//                      and which only counted in the old Group mode
+//   NumberWaitFactor   DWORD 0..1000 (default 0): the pause in ms between numbers, and with a group size between a
+//                      number's pieces and around a number
 //   PunctuationPause   DWORD 1 (the default): pauses at punctuation, PunctuationWaitFactor long; 0: none
 //   PunctuationWaitFactor  DWORD 0..1000 (default 0): the pause in ms at punctuation
 //   RemovePunctuation  DWORD 1: the punctuation marks where a pause can go are left out of the text; 0 (the default)
@@ -212,8 +213,8 @@ struct Settings {
     std::map<std::wstring, std::wstring> voices;     // language -> token id, or kNoVoice
     std::map<std::wstring, Adjustment> adjustments;  // language -> its adjustments
     // WorldVoice's number stages and punctuation pauses (its pipeline settings of the same names, version 7.0)
-    std::wstring numberMode = L"value";              // number_mode: none, value, number or group
-    int groupSize = 3;                               // group_size, 2..10
+    std::wstring numberMode = L"value";              // number_mode: none, value or number
+    int groupSize = 0;                               // group_size, 0 (no groups) up
     int numberWaitFactor = 0;                        // number_wait_factor, in ms (the add-on: 10, times its global one)
     bool punctuationPause = true;                    // punctuation_pause_enabled
     int punctuationWaitFactor = 0;                   // punctuation_wait_factor, in ms
@@ -243,8 +244,8 @@ struct Settings {
         if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberLanguage", numbers) && !numbers.empty())
             numberLanguage = (numbers == kNumbersFollow || numbers == kNumbersMain) ? numbers : PrimaryLanguage(numbers);
         std::wstring mode;      // any other mode reads as value (_number_mode)
-        if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"none" || mode == L"number" || mode == L"group")) numberMode = mode;
-        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"GroupSize", d) && d >= 2 && d <= 10) groupSize = (int)d;   // else 3
+        if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"none" || mode == L"number")) numberMode = mode;
+        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"NumberGroupSize", d) && d <= 2147483647) groupSize = (int)d;   // else 0
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"NumberWaitFactor", d)) numberWaitFactor = ClampFactor(d);
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationPause", d)) punctuationPause = d != 0;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationWaitFactor", d)) punctuationWaitFactor = ClampFactor(d);
