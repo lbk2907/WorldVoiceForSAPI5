@@ -30,8 +30,8 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   Python 3.13, Unicode 15.1), and say which in the commit.
 * **Every departure is written down.**  What this voice adds or does its own way (the Cyrillic and Devanagari
   settings, Chinese as the CJK characters' default language where the add-on has Japanese, the main language as the
-  default number language where the add-on has the surrounding text's, all the wait factors starting at 0, the one
-  sound format at
+  default number language where the add-on has the surrounding text's, the two wait factors in plain
+  milliseconds, starting at 0, with no global one, the one sound format at
   the chosen voices' highest rate, the trimmed silences, each language's rate, pitch and volume, the full stops next
   to numbers left without the add-on's spaces, the symbols in a number left unnamed, the spaces kept where the pauses
   between numbers go in) is described in `README.md` and `setup\README.txt`.  If it was asked for, say so: "(user

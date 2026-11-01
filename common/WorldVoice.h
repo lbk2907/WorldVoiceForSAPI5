@@ -16,11 +16,10 @@
 //   NumberMode         "none", "value" (the default), "number" (digit by digit) or "group" (GroupSize digits at a
 //                      time): WorldVoice's number mode
 //   GroupSize          DWORD 2..10 (default 3)
-//   GlobalWaitFactor   DWORD 0..100 in tens (default 0): each pause is its factor times this factor's tens, in ms
-//   NumberWaitFactor   DWORD 0..100 (default 0): the pause between numbers, and in Number and Group modes between
-//                      a number's pieces and around a number
+//   NumberWaitFactor   DWORD 0..1000 (default 0): the pause in ms between numbers, and in Number and Group modes
+//                      between a number's pieces and around a number
 //   PunctuationPause   DWORD 1 (the default): pauses at punctuation, PunctuationWaitFactor long; 0: none
-//   PunctuationWaitFactor  DWORD 0..100 (default 0)
+//   PunctuationWaitFactor  DWORD 0..1000 (default 0): the pause in ms at punctuation
 //   RemovePunctuation  DWORD 1: the punctuation marks where a pause can go are left out of the text; 0 (the default)
 //   PunctuationCharacters  the marks those are, as typed (missing: none)
 //   Log                DWORD 1: the voice writes %TEMP%\WorldVoice.log
@@ -198,7 +197,7 @@ struct Adjustment {
     bool None() const { return !rate && !pitch && !volume; }
 };
 inline int ClampAdjustment(int v) { return v < -10 ? -10 : (v > 10 ? 10 : v); }
-inline int ClampFactor(DWORD v) { return v > 100 ? 100 : (int)v; }   // a wait factor, 0..100
+inline int ClampFactor(DWORD v) { return v > 1000 ? 1000 : (int)v; }   // a wait factor: its pause in ms, 0..1000
 
 // The number languages that are not a language (the add-on's numberLanguage.py): numbers read in the language of the
 // text around them (the add-on's default), or in the main language (the language the program marks, or the main voice's;
@@ -215,17 +214,15 @@ struct Settings {
     // WorldVoice's number stages and punctuation pauses (its pipeline settings of the same names, version 7.0)
     std::wstring numberMode = L"value";              // number_mode: none, value, number or group
     int groupSize = 3;                               // group_size, 2..10
-    int globalWaitFactor = 0;                        // global_wait_factor, 0..100 in tens (the add-on's default: 10)
-    int numberWaitFactor = 0;                        // number_wait_factor, 0..100 (the add-on's default: 10)
+    int numberWaitFactor = 0;                        // number_wait_factor, in ms (the add-on: 10, times its global one)
     bool punctuationPause = true;                    // punctuation_pause_enabled
-    int punctuationWaitFactor = 0;                   // punctuation_wait_factor, 0..100
+    int punctuationWaitFactor = 0;                   // punctuation_wait_factor, in ms
     bool removePunctuation = false;                  // remove_punctuation_characters
     std::wstring punctuationCharacters;              // punctuation_pause_characters, as typed (none by default)
 
-    // WorldVoice's scaled waits: a factor's pause is the global wait factor's tens times the factor, in ms.
-    int GlobalUnits() const { return globalWaitFactor / 10; }
-    int NumberWaitMs() const { return GlobalUnits() * numberWaitFactor; }
-    int PunctuationWaitMs() const { return GlobalUnits() * punctuationWaitFactor; }
+    // A wait factor is its pause, in ms (the add-on multiplies it by a global wait factor; not here, user request).
+    int NumberWaitMs() const { return numberWaitFactor; }
+    int PunctuationWaitMs() const { return punctuationWaitFactor; }
 
     Adjustment AdjustmentFor(const std::wstring& lang) const {
         auto it = adjustments.find(PrimaryLanguage(lang));
@@ -248,7 +245,6 @@ struct Settings {
         std::wstring mode;      // any other mode reads as value (_number_mode)
         if (ReadString(HKEY_CURRENT_USER, kSettingsKey, L"NumberMode", mode) && (mode == L"none" || mode == L"number" || mode == L"group")) numberMode = mode;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"GroupSize", d) && d >= 2 && d <= 10) groupSize = (int)d;   // else 3
-        if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"GlobalWaitFactor", d)) globalWaitFactor = ClampFactor(d) / 10 * 10;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"NumberWaitFactor", d)) numberWaitFactor = ClampFactor(d);
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationPause", d)) punctuationPause = d != 0;
         if (ReadDword(HKEY_CURRENT_USER, kSettingsKey, L"PunctuationWaitFactor", d)) punctuationWaitFactor = ClampFactor(d);

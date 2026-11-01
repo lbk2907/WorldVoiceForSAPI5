@@ -87,31 +87,27 @@ BEGIN
     PUSHBUTTON      "&Play", IDC_PLAY, 258, 243, 48, 14
 
     // ---- Numbers and punctuation ----
-    // WorldVoice's settings of the same names (its Speech Pipeline panel). A pause is the global wait factor's tens
-    // times its own wait factor, in ms: the global wait factor's slider goes from 0 to 10 (it is saved in tens, 0 to
-    // 100), the others from 0 to 100. The sliders have TBS_DOWNISLEFT, as above. The group size is a spin box
+    // WorldVoice's settings of the same names (its Speech Pipeline panel), but for its global wait factor. A wait
+    // factor is its pause in ms: its slider goes from 0 to 1000, by 10. The sliders have TBS_DOWNISLEFT, as above. The
+    // group size is a spin box
     // (msctls_updown32 with UDS_SETBUDDYINT, UDS_ALIGNRIGHT, UDS_AUTOBUDDY, UDS_ARROWKEYS and UDS_NOTHOUSANDS), 2 to 10.
-    GROUPBOX        "Pauses", IDC_WAITGROUP, 6, 24, 308, 32
-    LTEXT           "&Global wait factor:", IDC_GLOBALWAIT_L, 12, 39, 110, 8
-    CONTROL         "", IDC_GLOBALWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 36, 150, 14
-    LTEXT           "", IDC_GLOBALWAIT_V, 274, 39, 34, 8
-    GROUPBOX        "Numbers", IDC_NUMGROUP, 6, 60, 308, 70
-    LTEXT           "Number &mode:", IDC_NUMMODE_L, 12, 74, 110, 8
-    COMBOBOX        IDC_NUMMODE, 124, 72, 182, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Group si&ze:", IDC_GROUPSIZE_L, 12, 93, 110, 8
-    EDITTEXT        IDC_GROUPSIZE, 124, 91, 40, 12, ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL         "", IDC_GROUPSIZE_SPIN, "msctls_updown32", 0x00B6, 164, 91, 10, 12
-    LTEXT           "Num&ber wait factor:", IDC_NUMWAIT_L, 12, 113, 110, 8
-    CONTROL         "", IDC_NUMWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 110, 150, 14
-    LTEXT           "", IDC_NUMWAIT_V, 274, 113, 34, 8
-    GROUPBOX        "Punctuation", IDC_PUNCTGROUP, 6, 134, 308, 82
-    AUTOCHECKBOX    "Enable &punctuation pause control", IDC_PUNCTPAUSE, 12, 148, 294, 10
-    AUTOCHECKBOX    "&Remove configured punctuation at pause points", IDC_PUNCTREMOVE, 12, 162, 294, 10
-    LTEXT           "Punctuation &wait factor:", IDC_PUNCTWAIT_L, 12, 179, 110, 8
-    CONTROL         "", IDC_PUNCTWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 176, 150, 14
-    LTEXT           "", IDC_PUNCTWAIT_V, 274, 179, 34, 8
-    LTEXT           "Punctuation pause c&haracters:", IDC_PUNCTCHARS_L, 12, 198, 110, 8
-    EDITTEXT        IDC_PUNCTCHARS, 124, 196, 182, 12, ES_AUTOHSCROLL
+    GROUPBOX        "Numbers", IDC_NUMGROUP, 6, 24, 308, 70
+    LTEXT           "Number &mode:", IDC_NUMMODE_L, 12, 38, 110, 8
+    COMBOBOX        IDC_NUMMODE, 124, 36, 182, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Group si&ze:", IDC_GROUPSIZE_L, 12, 57, 110, 8
+    EDITTEXT        IDC_GROUPSIZE, 124, 55, 40, 12, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_GROUPSIZE_SPIN, "msctls_updown32", 0x00B6, 164, 55, 10, 12
+    LTEXT           "Num&ber wait factor:", IDC_NUMWAIT_L, 12, 77, 110, 8
+    CONTROL         "", IDC_NUMWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 74, 150, 14
+    LTEXT           "", IDC_NUMWAIT_V, 274, 77, 34, 8
+    GROUPBOX        "Punctuation", IDC_PUNCTGROUP, 6, 98, 308, 82
+    AUTOCHECKBOX    "Enable &punctuation pause control", IDC_PUNCTPAUSE, 12, 112, 294, 10
+    AUTOCHECKBOX    "&Remove configured punctuation at pause points", IDC_PUNCTREMOVE, 12, 126, 294, 10
+    LTEXT           "Punctuation &wait factor:", IDC_PUNCTWAIT_L, 12, 143, 110, 8
+    CONTROL         "", IDC_PUNCTWAIT, TRACKBAR_CLASS, TBS_NOTICKS | 0x0400 | WS_TABSTOP, 120, 140, 150, 14
+    LTEXT           "", IDC_PUNCTWAIT_V, 274, 143, 34, 8
+    LTEXT           "Punctuation pause c&haracters:", IDC_PUNCTCHARS_L, 12, 162, 110, 8
+    EDITTEXT        IDC_PUNCTCHARS, 124, 160, 182, 12, ES_AUTOHSCROLL
 
     // ---- Log ----
     GROUPBOX        "Debug log", IDC_GRP_LOG, 6, 24, 308, 92
