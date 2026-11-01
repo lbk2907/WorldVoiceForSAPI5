@@ -325,15 +325,17 @@ setup, `Output\WorldVoice for SAPI 5 Setup.exe` (under a minute). To clean the f
 ### The script table
 
 Only needed when the WorldVoice add-on's language detection changes; `common\ScriptData.h` in this repository was made
-from the add-on's version 6.2.
+from the add-on's version 7.0, with Python 3.13 (the Python NVDA 2026.3 runs the add-on on).
 
 ```bat
-python tools\make_scripts.py "<WorldVoice add-on>\synthDrivers\WorldVoice\languageDetection"
+python tools\make_scripts.py "<WorldVoice add-on>\synthDrivers\WorldVoice"
 ```
 
-This writes `common\ScriptData.h`: the Unicode script of every character (from the add-on's `script_data.py`, Unicode
-16.0.0), the languages each script can be and the scripts with a language setting (from its `__init__.py`), and the
-digits and spaces as Python's `str.isdigit()`, `str.isdecimal()` and `str.isspace()` see them, which the add-on uses.
+This writes `common\ScriptData.h`: the Unicode script of every character (from the add-on's
+`unicodeScripts\script_data.py`, Unicode 18.0.0), the languages each script can be and the scripts with a language
+setting (from its `languageDetection\scriptLanguages.py`), and what the add-on asks Python about characters: digits
+(`str.isdecimal()`, `\d`), spaces (`str.isspace()`), word characters (`\w`) and the Latin-1 punctuation and symbols
+a number may hold. Run it with the Python NVDA runs the add-on on, so these answers are the add-on's.
 The table is made from the add-on rather than taken from Windows, whose Unicode data is older, so that WorldVoice
 splits a text exactly as the add-on does.
 
@@ -377,7 +379,7 @@ purpose. See [LICENSE](LICENSE) for the full text.
 - The language detection's rules, the number mode, the pauses at punctuation and `common\ScriptData.h` come from the
   [WorldVoice add-on](https://github.com/tsengwoody/WorldVoice) by Tseng Woody, which is under the GNU General Public
   License.
-- The script table's Unicode data: Unicode, Inc.'s character database (Unicode 16.0.0), as the add-on has it.
+- The script table's Unicode data: Unicode, Inc.'s character database (Unicode 18.0.0), as the add-on has it.
 
 ## Credits
 

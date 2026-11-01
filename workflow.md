@@ -20,11 +20,11 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   stay right.
 * **Work from the add-on's code, not from memory.**  Read the add-on's function while porting or changing its C++
   counterpart.  The add-on is at <https://github.com/tsengwoody/WorldVoice>, and on a computer with it installed in
-  `%APPDATA%\nvda\addons\WorldVoice\synthDrivers\WorldVoice\languageDetection`.
+  `%APPDATA%\nvda\addons\WorldVoice\synthDrivers\WorldVoice`.
 * **The script table is generated, never edited.**  `common\ScriptData.h` comes from `tools\make_scripts.py`:
-  change the generator and run it again.  It takes the digits and spaces from the Python that runs it
-  (`str.isdigit()`, `str.isspace()`), so run it with a Python whose Unicode version (`unicodedata.unidata_version`)
-  is the one the add-on's NVDA runs on, and say which in the commit.
+  change the generator and run it again.  It takes digits, spaces and word characters from the Python that runs it
+  (`str.isdecimal()`, `str.isspace()`, `\w`), so run it with the Python the add-on's NVDA runs on (NVDA 2026.3:
+  Python 3.13, Unicode 15.1), and say which in the commit.
 * **Every departure is written down.**  What this voice adds or does its own way (the Cyrillic and Devanagari
   settings, the one sound format at the chosen voices' highest rate, the trimmed silences, each language's rate,
   pitch and volume, the full stops

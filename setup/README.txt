@@ -249,7 +249,7 @@ WorldVoice for SAPI 5's own code: copyright Loh Boon Keat.
 The language detection's rules, the number mode, the pauses at punctuation and the script table come from the
 WorldVoice add-on by Tseng Woody (https://github.com/tsengwoody/WorldVoice), which is under the GNU General Public
 License.
-The script table's Unicode data: Unicode, Inc.'s character database (Unicode 16.0.0), as the add-on has it.
+The script table's Unicode data: Unicode, Inc.'s character database (Unicode 18.0.0), as the add-on has it.
 
 
 Credits
