@@ -273,14 +273,47 @@ static void OnWaitSlider(HWND d, HWND slider) {
     ShowWaits(d);
 }
 
+// What is no longer installed does not stay chosen (user request, 2026-11-02). A voice that has gone goes back to None,
+// also with other voices of its language left, and stays None if it comes back. A language no installed voice speaks loses
+// its adjustments; as the main language it gives way to the one Windows is displayed in, as the number language to
+// following the main language. All of it saved. Only here, not in the voice, which follows the same rule as it speaks but
+// saves nothing: it sees the voices of its program's bitness, and one that is being installed again may be missing for a
+// moment. With nothing saved, nothing is written until a setting changes; with no voice installed at all, nothing changes.
+static void ForgetUninstalled() {
+    if (g_voices.empty()) return;
+    for (auto it = g_settings.voices.begin(); it != g_settings.voices.end();) {
+        bool there = it->second == wv::kNoVoice;
+        for (const wv::VoiceInfo& v : g_voices) there = there || _wcsicmp(v.id.c_str(), it->second.c_str()) == 0;
+        if (there) { ++it; continue; }
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, wv::kVoicesKey, it->first.c_str());
+        it = g_settings.voices.erase(it);
+    }
+    for (auto it = g_settings.adjustments.begin(); it != g_settings.adjustments.end();) {
+        if (wv::Installed(g_voices, it->first)) { ++it; continue; }
+        RegDeleteTreeW(HKEY_CURRENT_USER, (std::wstring(wv::kAdjustmentsKey) + L"\\" + it->first).c_str());
+        it = g_settings.adjustments.erase(it);
+    }
+    if (!wv::Installed(g_voices, g_settings.mainLanguage)) {
+        bool saved = !g_settings.mainLanguage.empty();
+        g_settings.mainLanguage = wv::StartingLanguage(g_voices);
+        if (saved) SetString(L"MainLanguage", g_settings.mainLanguage);
+    }
+    const std::wstring& n = g_settings.numberLanguage;
+    if (n != wv::kNumbersFollow && n != wv::kNumbersMain && !wv::Installed(g_voices, n)) {
+        g_settings.numberLanguage = wv::kNumbersMain;
+        SetString(L"NumberLanguage", g_settings.numberLanguage);
+    }
+}
+
 static void Fill(HWND d) {
     g_filling = true;
-    // Main language: the Voices tab's languages (and the one chosen, if its voices have gone), with a voice or not.
+    ForgetUninstalled();
+    // Main language: the Voices tab's languages (and the one chosen, when no voice is installed at all), with a voice or not.
     wv::VoiceMap map;
     map.Build(g_settings, g_voices);
     SetDlgItemTextW(d, IDC_STATUS, L"");
     g_mainChoices = g_allLanguages;
-    if (std::find(g_mainChoices.begin(), g_mainChoices.end(), g_settings.mainLanguage) == g_mainChoices.end()) g_mainChoices.push_back(g_settings.mainLanguage);
+    if (!g_settings.mainLanguage.empty() && std::find(g_mainChoices.begin(), g_mainChoices.end(), g_settings.mainLanguage) == g_mainChoices.end()) g_mainChoices.push_back(g_settings.mainLanguage);
     std::sort(g_mainChoices.begin(), g_mainChoices.end(), [](const std::wstring& a, const std::wstring& b) { return wv::LanguageName(a) < wv::LanguageName(b); });
     FillLanguages(d, IDC_MAINLANG, g_mainChoices, g_settings.mainLanguage);
     FillList(d);

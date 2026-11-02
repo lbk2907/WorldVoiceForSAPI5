@@ -2,8 +2,9 @@
 // and WorldVoice's language detection (the NVDA add-on's languageDetection, rule for rule).
 //
 // Settings, HKCU\SOFTWARE\WorldVoice:
-//   MainLanguage       the main language, e.g. "en" (its voice reads anything with no script); with no voice chosen for
-//                      it, Windows' default voice takes its place (see VoiceMap)
+//   MainLanguage       the main language, e.g. "en" (its voice reads anything with no script). Missing, or no installed
+//                      voice speaks it: the language Windows is displayed in (StartingLanguage). With no voice chosen
+//                      for it, Windows' default voice takes its place (see VoiceMap)
 //   LatinLanguage      the language assumed for Latin characters when the text around them is not a Latin language
 //   HanLanguage        the same for CJK characters (Han): "zh", "ja" or "ko"
 //   ArabicLanguage, CyrillicLanguage, DevanagariLanguage   the same for those scripts
@@ -208,7 +209,7 @@ static const wchar_t* const kNumbersFollow = L"default";
 static const wchar_t* const kNumbersMain = L"main";
 
 struct Settings {
-    std::wstring mainLanguage = L"en", latinLanguage = L"en", hanLanguage = L"zh", arabicLanguage = L"ar";
+    std::wstring mainLanguage, latinLanguage = L"en", hanLanguage = L"zh", arabicLanguage = L"ar";   // main: none saved is empty (StartingLanguage)
     std::wstring cyrillicLanguage = L"ru", devanagariLanguage = L"hi";
     std::wstring numberLanguage = kNumbersMain;      // number_language: kNumbersMain, kNumbersFollow or a language
     std::map<std::wstring, std::wstring> voices;     // language -> token id, or kNoVoice
@@ -365,11 +366,37 @@ inline std::wstring AutomaticVoice(const std::vector<VoiceInfo>& voices, const s
     return main ? main->id : (first ? first->id : std::wstring());
 }
 
+// Whether an installed voice speaks the language.
+inline bool Installed(const std::vector<VoiceInfo>& voices, const std::wstring& lang) {
+    std::wstring p = PrimaryLanguage(lang);
+    for (const VoiceInfo& v : voices) if (std::find(v.languages.begin(), v.languages.end(), p) != v.languages.end()) return true;
+    return false;
+}
+
+// Windows' default SAPI 5 voice, else an American English voice, else the first one.
+inline const VoiceInfo* WindowsVoice(const std::vector<VoiceInfo>& voices) {
+    std::wstring defaultId = ReadString(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Speech\\Voices", L"DefaultTokenId");
+    const VoiceInfo* v = nullptr;
+    for (const VoiceInfo& x : voices) if (_wcsicmp(x.id.c_str(), defaultId.c_str()) == 0) v = &x;
+    if (!v) { std::wstring id = AutomaticVoice(voices, L"en"); for (const VoiceInfo& x : voices) if (x.id == id) v = &x; }
+    if (!v && !voices.empty()) v = &voices[0];
+    return v;
+}
+
+// The main language when none is saved, or no installed voice speaks the saved one (user request, 2026-11-02): the
+// language Windows is displayed in, else, with no voice for that, the language of Windows' default voice.
+inline std::wstring StartingLanguage(const std::vector<VoiceInfo>& voices) {
+    std::wstring windows = LanguageOfLcid(GetUserDefaultUILanguage());
+    if (Installed(voices, windows)) return windows;
+    const VoiceInfo* v = WindowsVoice(voices);
+    return v && !v->languages.empty() ? v->languages[0] : windows;
+}
+
 // Which voice reads each language: the languages a voice was chosen for (WorldVoice switches to no other), and the
-// main language. A main language with no voice follows Windows (user request, 2026-11-02), whatever language it is:
-// Windows' default SAPI 5 voice, else an American English voice, else the first one (see AutomaticVoice), takes the main
-// language's place, in that language if it speaks it, else in its own. A voice chosen for that language still reads it,
-// so that one sentence is not read by two voices of a language. With no voice chosen at all this voice reads everything.
+// main language. A main language with no voice chosen follows Windows (user request, 2026-11-02), whatever language it
+// is: WindowsVoice takes its place, in that language if it speaks it, else in its own. A voice chosen for that language
+// still reads it, so that one sentence is not read by two voices of a language. With no voice chosen at all this voice
+// reads everything.
 class VoiceMap {
 public:
     void Build(const Settings& s, const std::vector<VoiceInfo>& voices) {
@@ -380,6 +407,7 @@ public:
             if (kv.second != kNoVoice && Find(voices, kv.second)) { m_languages.insert(kv.first); m_voices[kv.first] = kv.second; }
         m_chosen = m_languages;
         std::wstring wanted = PrimaryLanguage(s.mainLanguage);
+        if (!Installed(voices, wanted)) wanted = StartingLanguage(voices);
         if (m_chosen.count(wanted)) { m_main = wanted; return; }
         const VoiceInfo* v = WindowsVoice(voices);
         if (!v || v->languages.empty()) {
@@ -402,14 +430,6 @@ private:
     static bool Find(const std::vector<VoiceInfo>& voices, const std::wstring& id) {
         for (const VoiceInfo& v : voices) if (_wcsicmp(v.id.c_str(), id.c_str()) == 0) return true;
         return false;
-    }
-    static const VoiceInfo* WindowsVoice(const std::vector<VoiceInfo>& voices) {
-        std::wstring defaultId = ReadString(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Speech\\Voices", L"DefaultTokenId");
-        const VoiceInfo* v = nullptr;
-        for (const VoiceInfo& x : voices) if (_wcsicmp(x.id.c_str(), defaultId.c_str()) == 0) v = &x;
-        if (!v) { std::wstring id = AutomaticVoice(voices, L"en"); for (const VoiceInfo& x : voices) if (x.id == id) v = &x; }
-        if (!v && !voices.empty()) v = &voices[0];
-        return v;
     }
     std::set<std::wstring> m_languages, m_chosen;
     std::map<std::wstring, std::wstring> m_voices;

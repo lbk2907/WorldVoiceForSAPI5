@@ -146,7 +146,13 @@ General tab
         numbers, and the languages that have a voice still switch. A voice chosen for the default voice's own language
         reads that language instead, so that one sentence is not read by two voices of a language. Give the main
         language a voice later and it takes over; set it back to None and the main language stays what you chose (user
-        request).
+        request). With nothing saved yet, or when no installed voice speaks the main language any more, WorldVoice
+        follows the language Windows is displayed in, or, with no voice for that either, the language of Windows'
+        default voice. The configuration program saves that when it next opens, and forgets the rest of what is no
+        longer installed (user request): a number language no installed voice speaks goes back to "Follow main
+        language", a chosen voice that has gone goes back to None, also with other voices of its language left, and a
+        language with no voice left loses its rate, pitch and volume. If you install a voice again after that, you
+        choose it again.
     Language detection
         Language assumed for Latin, CJK, Arabic, Cyrillic and Devanagari characters: the language for that script's
         text when the text around it is not already in one of the script's languages (see above). Each list holds the
