@@ -395,7 +395,6 @@ public:
     bool IsFallback() const { return m_fallback; }
     const std::set<std::wstring>& Languages() const { return m_languages; }      // WorldVoice's availableLanguages
     bool Has(const std::wstring& lang) const { return m_languages.count(PrimaryLanguage(lang)) != 0; }
-    bool Chosen(const std::wstring& lang) const { return m_chosen.count(PrimaryLanguage(lang)) != 0; }   // a voice was chosen for it
     std::wstring VoiceFor(const std::wstring& lang) const {
         auto it = m_voices.find(PrimaryLanguage(lang));
         return it == m_voices.end() ? std::wstring() : it->second;

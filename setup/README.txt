@@ -143,10 +143,10 @@ General tab
         The language of the text: what WorldVoice reads in when nothing else decides. The list holds the same
         languages as the Voices tab, those your installed voices speak. You can choose one with no voice chosen:
         Windows' default SAPI 5 voice (in the Control Panel's Speech settings) then reads the main text and the
-        numbers, the languages that have a voice still switch, and the line at the bottom of the window says which
-        voice reads. A voice chosen for the default voice's own language reads that language instead, so that one
-        sentence is not read by two voices of a language. Give the main language a voice later and it takes over; set
-        it back to None and the main language stays what you chose (user request).
+        numbers, and the languages that have a voice still switch. A voice chosen for the default voice's own language
+        reads that language instead, so that one sentence is not read by two voices of a language. Give the main
+        language a voice later and it takes over; set it back to None and the main language stays what you chose (user
+        request).
     Language detection
         Language assumed for Latin, CJK, Arabic, Cyrillic and Devanagari characters: the language for that script's
         text when the text around it is not already in one of the script's languages (see above). Each list holds the
