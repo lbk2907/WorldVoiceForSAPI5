@@ -142,9 +142,13 @@ only multiply them, so it is left out (user request).
 **Number mode:**
 
 - **Off**: numbers are left as they are.
-- **Value** (the default): numbers as they are written, for the voice to read its own way, but without the commas of
-  a number written with thousands separators: "12,345,678" goes to the voice as "12345678". Only commas that make
-  whole groups of three count: "1,234,5" and "a,1,234" stay as they are.
+- **Value** (the default): numbers as they are written, for the voice to read its own way, commas too, so a voice reads
+  "1,234,567,890" as it does on its own. Only with a group size do the commas of a number written with thousands
+  separators go first, and "12,345,678" is cut from "12345678"; only commas that make whole groups of three count:
+  "1,234,5" and "a,1,234" stay as they are. The add-on takes them out without a group size too. WorldVoice for SAPI 5
+  does not (user request): of 13 voices measured, none reads a number better without them, and some take half as long
+  over it, no longer reading its value (Eloquence and VoiceText over "1,234", Microsoft's and iFlytek's over
+  "1,234,567").
 - **Number**: digit by digit, "12345" as "1 2 3 4 5" and "-123" as "-1 2 3". A symbol inside a number is read apart
   too ("12:30" as "1 2 : 3 0"). The voice gets all of it as one text, with no pauses between the digits.
 

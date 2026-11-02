@@ -21,6 +21,10 @@
 // it is: NVDA spells punctuation by name.
 //
 // Where it does not do what the add-on does (both READMEs say so):
+// - remove_thousands_separators runs only with a group size above 0, where the digits are cut into pieces. Without one
+//   a number keeps its commas and each voice reads it as it reads it alone (user request, 2026-11-02): without them
+//   David, Zira and the iFlytek voices take half as long over "1,234,567", and Eloquence and VoiceText over "1,234", so
+//   they no longer read its value. Of 13 voices measured, none reads a number better for losing them.
 // - inject_numbers' dot rule, a full stop right before or after a number set apart with a space ("2.54.2" read as
 //   "2.54 . 2"), is left out (user request, 2026-10-13).
 // - number_wait_factor strips the spaces from both ends of every text and drops blank texts (_remove_space). Here the
@@ -31,6 +35,7 @@
 #pragma once
 #include <sapi.h>
 #include <sapiddk.h>
+#include <deque>
 #include <string>
 #include <vector>
 #include "../common/WorldVoice.h"
@@ -59,7 +64,7 @@ public:
         m_changed = false;
         std::vector<Item> items, next;
         Gather(frags, items);
-        if (m_mode == L"value") RemoveThousands(items);
+        if (m_mode == L"value" && m_group > 0) RemoveThousands(items);
         InjectNumbers(items, next);
         items.swap(next);
         next.clear();
@@ -87,8 +92,9 @@ public:
 
 private:
     // Where a character of a text comes from: SAPI's fragment and its place in it. A space put in (Render) has the
-    // place of the character after it, and is not in the program's text.
-    struct Src { const SPVTEXTFRAG* frag; ULONG pos; bool added = false; };
+    // place of the character after it, and is not in the program's text. afterComma: a thousands comma was taken out
+    // right before it, and the digits on its two sides stay one text (see Fragments).
+    struct Src { const SPVTEXTFRAG* frag; ULONG pos; bool added = false; bool afterComma = false; };
     // The add-on's kinds of pause: a BreakCommand of the program's, NumberBreakCommand, NumberEdgeBreakCommand,
     // NumberItemEdgeBreakCommand and PunctuationBreakCommand.
     enum class Pause { Plain, Number, NumberEdge, NumberItemEdge, Punctuation };
@@ -260,7 +266,12 @@ private:
             Item kept = item;
             kept.text.clear();
             kept.src.clear();
-            for (size_t i = 0; i < n; i++) if (!drop[i]) { kept.text += t[i]; kept.src.push_back(item.src[i]); }
+            for (size_t i = 0; i < n; i++) {
+                if (drop[i]) continue;
+                kept.text += t[i];
+                kept.src.push_back(item.src[i]);
+                kept.src.back().afterComma = i > 0 && drop[i - 1];
+            }
             item = kept;
             m_changed = true;
         }
@@ -584,8 +595,10 @@ private:
         m_changed = true;
     }
 
-    // An item as SAPI's fragments.
-    static void Fragments(const Item& item, std::vector<SPVTEXTFRAG>& out) {
+    // An item as SAPI's fragments. Digits with a thousands comma taken out between them go as one fragment, with a text
+    // of its own: as two, a voice would take the gap in the program's text for a space SAPI left out at a tag, and read
+    // "1,234" as "1 234".
+    void Fragments(const Item& item, std::vector<SPVTEXTFRAG>& out) {
         if (item.kind == Item::Text) {
             for (size_t i = 0; i < item.src.size();) {
                 const Src& s = item.src[i];
@@ -601,8 +614,17 @@ private:
                     continue;
                 }
                 size_t j = i + 1;
-                while (j < item.src.size() && !item.src[j].added && item.src[j].frag == s.frag && item.src[j].pos == item.src[j - 1].pos + 1) j++;
+                bool joined = false;
+                while (j < item.src.size() && !item.src[j].added && item.src[j].frag == s.frag &&
+                       (item.src[j].pos == item.src[j - 1].pos + 1 || item.src[j].afterComma)) {
+                    joined = joined || item.src[j].afterComma;
+                    j++;
+                }
                 f.pTextStart = s.frag->pTextStart + s.pos;
+                if (joined) {
+                    m_joined.push_back(std::wstring(item.text, i, j - i));
+                    f.pTextStart = m_joined.back().c_str();
+                }
                 f.ulTextLen = (ULONG)(j - i);
                 f.ulTextSrcOffset = s.frag->ulTextSrcOffset + s.pos;
                 out.push_back(f);
@@ -638,6 +660,7 @@ private:
     LANGID m_tokenLangId;
     std::wstring m_numberLanguage;      // a number language that is a language; empty for "default" and "main"
     std::vector<uint32_t> m_chars;
+    std::deque<std::wstring> m_joined;  // the texts of fragments that lost a thousands comma (Fragments)
     bool m_changed = false;
 };
 
