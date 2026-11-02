@@ -87,15 +87,12 @@ static int AddItem(HWND d, int id, const std::wstring& text) {
     return (int)SendDlgItemMessageW(d, id, CB_ADDSTRING, 0, (LPARAM)text.c_str());
 }
 
-// A list of languages; the item data indexes into the vector given. With a map, a language with no voice chosen says so,
-// as the main language's list does: it follows Windows (commas, as a screen reader may read brackets out).
-static void FillLanguages(HWND d, int id, const std::vector<std::wstring>& langs, const std::wstring& selected, const wv::VoiceMap* map = nullptr) {
+// A list of languages; the item data indexes into the vector given.
+static void FillLanguages(HWND d, int id, const std::vector<std::wstring>& langs, const std::wstring& selected) {
     SendDlgItemMessageW(d, id, CB_RESETCONTENT, 0, 0);
     int sel = 0;
     for (size_t i = 0; i < langs.size(); i++) {
-        std::wstring name = wv::LanguageName(langs[i]);
-        if (map && !map->Chosen(langs[i])) name += L", no voice, follows Windows";
-        int item = AddItem(d, id, name);
+        int item = AddItem(d, id, wv::LanguageName(langs[i]));
         SendDlgItemMessageW(d, id, CB_SETITEMDATA, item, (LPARAM)i);
     }
     for (int item = 0, n = (int)SendDlgItemMessageW(d, id, CB_GETCOUNT, 0, 0); item < n; item++)
@@ -291,7 +288,7 @@ static void Fill(HWND d) {
     g_mainChoices = g_allLanguages;
     if (std::find(g_mainChoices.begin(), g_mainChoices.end(), g_settings.mainLanguage) == g_mainChoices.end()) g_mainChoices.push_back(g_settings.mainLanguage);
     std::sort(g_mainChoices.begin(), g_mainChoices.end(), [](const std::wstring& a, const std::wstring& b) { return wv::LanguageName(a) < wv::LanguageName(b); });
-    FillLanguages(d, IDC_MAINLANG, g_mainChoices, g_settings.mainLanguage, &map);
+    FillLanguages(d, IDC_MAINLANG, g_mainChoices, g_settings.mainLanguage);
     FillList(d);
     FillVoices(d);
     for (ScriptChoice& sc : g_scripts) {
