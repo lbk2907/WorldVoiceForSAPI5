@@ -278,11 +278,7 @@ static void Fill(HWND d) {
     // Main language: the Voices tab's languages (and the one chosen, if its voices have gone), with a voice or not.
     wv::VoiceMap map;
     map.Build(g_settings, g_voices);
-    std::wstring status;
-    if (map.IsFallback())
-        for (const wv::VoiceInfo& v : g_voices)
-            if (v.id == map.VoiceFor(map.MainLanguage())) status = L"No voices chosen yet: " + v.name + L" reads everything. Choose voices on the Voices tab.";
-    SetDlgItemTextW(d, IDC_STATUS, status.c_str());
+    SetDlgItemTextW(d, IDC_STATUS, L"");
     g_mainChoices = g_allLanguages;
     if (std::find(g_mainChoices.begin(), g_mainChoices.end(), g_settings.mainLanguage) == g_mainChoices.end()) g_mainChoices.push_back(g_settings.mainLanguage);
     std::sort(g_mainChoices.begin(), g_mainChoices.end(), [](const std::wstring& a, const std::wstring& b) { return wv::LanguageName(a) < wv::LanguageName(b); });

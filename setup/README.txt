@@ -22,8 +22,8 @@ Getting started
 4. Choose the voice "WorldVoice" in the program that speaks. In NVDA: Speech settings, Synthesizer "Microsoft Speech
    API version 5", Voice "WorldVoice".
 Until a voice is chosen for at least one language, one voice reads everything: Windows' default SAPI 5 voice, else an
-American English voice, else the first voice installed. The configuration program says so at the bottom of its
-window. The same voice stands in for a main language with no voice chosen (see "The configuration program").
+American English voice, else the first voice installed. The same voice stands in for a main language with no voice
+chosen (see "The configuration program").
 Every change in the configuration program is saved at once (there is no Apply button) and used from the voice's next
 sentence, also in programs already speaking with it.
 

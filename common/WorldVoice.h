@@ -369,8 +369,7 @@ inline std::wstring AutomaticVoice(const std::vector<VoiceInfo>& voices, const s
 // main language. A main language with no voice follows Windows (user request, 2026-11-02), whatever language it is:
 // Windows' default SAPI 5 voice, else an American English voice, else the first one (see AutomaticVoice), takes the main
 // language's place, in that language if it speaks it, else in its own. A voice chosen for that language still reads it,
-// so that one sentence is not read by two voices of a language. With no voice chosen at all this voice reads everything;
-// IsFallback() then says so.
+// so that one sentence is not read by two voices of a language. With no voice chosen at all this voice reads everything.
 class VoiceMap {
 public:
     void Build(const Settings& s, const std::vector<VoiceInfo>& voices) {
@@ -380,7 +379,6 @@ public:
         for (const auto& kv : s.voices)
             if (kv.second != kNoVoice && Find(voices, kv.second)) { m_languages.insert(kv.first); m_voices[kv.first] = kv.second; }
         m_chosen = m_languages;
-        m_fallback = m_chosen.empty();
         std::wstring wanted = PrimaryLanguage(s.mainLanguage);
         if (m_chosen.count(wanted)) { m_main = wanted; return; }
         const VoiceInfo* v = WindowsVoice(voices);
@@ -392,7 +390,6 @@ public:
         m_main = speaksIt ? wanted : v->languages[0];
         if (!m_chosen.count(m_main)) { m_languages.insert(m_main); m_voices[m_main] = v->id; }
     }
-    bool IsFallback() const { return m_fallback; }
     const std::set<std::wstring>& Languages() const { return m_languages; }      // WorldVoice's availableLanguages
     bool Has(const std::wstring& lang) const { return m_languages.count(PrimaryLanguage(lang)) != 0; }
     std::wstring VoiceFor(const std::wstring& lang) const {
@@ -417,7 +414,6 @@ private:
     std::set<std::wstring> m_languages, m_chosen;
     std::map<std::wstring, std::wstring> m_voices;
     std::wstring m_main;
-    bool m_fallback = false;
 };
 
 // ---------------------------------------------------------------------------
