@@ -205,15 +205,15 @@ static ScriptChoice g_scripts[] = {
 };
 
 // The number language: the main language first, as the default (user request, where the add-on has the text's language
-// first), the text's language, then the languages with a voice (and the one chosen, if its voice has gone). What each
+// first), the text's language, then the Voices tab's languages (and the one chosen, if its voices have gone). What each
 // item of the list stands for.
 static std::vector<std::wstring> g_numberChoices;
 
-static void FillNumberLanguages(HWND d, const wv::VoiceMap& map) {
+static void FillNumberLanguages(HWND d) {
     g_numberChoices = { wv::kNumbersMain, wv::kNumbersFollow };
-    std::vector<std::wstring> langs(map.Languages().begin(), map.Languages().end());
+    std::vector<std::wstring> langs = g_allLanguages;
     const std::wstring& chosen = g_settings.numberLanguage;
-    if (chosen != wv::kNumbersFollow && chosen != wv::kNumbersMain && !map.Has(chosen)) langs.push_back(chosen);
+    if (chosen != wv::kNumbersFollow && chosen != wv::kNumbersMain && std::find(langs.begin(), langs.end(), chosen) == langs.end()) langs.push_back(chosen);
     std::sort(langs.begin(), langs.end(), [](const std::wstring& a, const std::wstring& b) { return wv::LanguageName(a) < wv::LanguageName(b); });
     g_numberChoices.insert(g_numberChoices.end(), langs.begin(), langs.end());
     SendDlgItemMessageW(d, IDC_NUMLANG, CB_RESETCONTENT, 0, 0);
@@ -293,7 +293,7 @@ static void Fill(HWND d) {
         EnableWindow(GetDlgItem(d, sc.id), !sc.languages.empty());
         EnableWindow(GetDlgItem(d, sc.labelId), !sc.languages.empty());
     }
-    FillNumberLanguages(d, map);
+    FillNumberLanguages(d);
     FillNumbersAndPunctuation(d);
     g_filling = false;
 }

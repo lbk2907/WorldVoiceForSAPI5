@@ -228,7 +228,8 @@ It has four tabs. Ctrl+Tab and Ctrl+Shift+Tab move between them.
   and Devanagari are added here, for the same reason. CJK characters are Chinese unless you choose otherwise, where
   the add-on assumes Japanese (user request).
 - **Number language**: the language numbers are read in: "Follow main language" (the default, user request), "Follow
-  surrounding text language", or one of the languages that have a voice (see
+  surrounding text language", or a language, from the same list as the Voices tab (user request). Numbers in a language
+  with no voice chosen are read by the main language's voice, in the main language (see
   [How WorldVoice splits a text](#how-worldvoice-splits-a-text)). It replaces WorldVoice's earlier "Ignore numbers
   when detecting text language", as in the add-on's version 7.0; the earlier setting is not carried over.
 

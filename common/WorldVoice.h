@@ -469,23 +469,23 @@ public:
     }
 
     // The language a number is read in, where the language in force is inForce (detect_with_number_language, and
-    // inject_numbers for a language): empty when numbers follow the text around them.
+    // inject_numbers for a language): empty when numbers follow the text around them. A number language with no voice
+    // is read by the main language's voice, in the main language, as spelled digits are (user request, 2026-11-02: the
+    // list offers every language with an installed voice, chosen or not).
     std::wstring NumberLanguageAt(const std::wstring& inForce) const {
         const std::wstring& n = m_settings.numberLanguage;
         if (n == kNumbersFollow) return std::wstring();
-        return n == kNumbersMain ? inForce : n;
+        if (n == kNumbersMain) return inForce;
+        return m_map.Has(n) ? n : m_map.MainLanguage();
     }
 
     // Whether two languages are read alike: the add-on keeps a language switch only where the voice changes
     // (deduplicate_language_command). A voice can also be chosen for two languages here, as Eloquence, one voice with
     // many languages, can (user report, 2026-11-02: its numbers stayed in the text's language), and it reads each of
-    // them in that language: those two are not alike. A language with no voice is read by the main language's.
+    // them in that language: those two are not alike. A language with no voice is read as the main language.
     bool ReadAlike(const std::wstring& a, const std::wstring& b) const {
-        if (m_map.Has(a) && m_map.Has(b)) return PrimaryLanguage(a) == PrimaryLanguage(b);
-        std::wstring va = m_map.VoiceFor(a), vb = m_map.VoiceFor(b), main = m_map.VoiceFor(m_map.MainLanguage());
-        if (va.empty()) va = main;
-        if (vb.empty()) vb = main;
-        return _wcsicmp(va.c_str(), vb.c_str()) == 0;
+        const std::wstring& main = m_map.MainLanguage();
+        return PrimaryLanguage(m_map.Has(a) ? a : main) == PrimaryLanguage(m_map.Has(b) ? b : main);
     }
 
 private:
