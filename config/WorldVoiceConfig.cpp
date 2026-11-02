@@ -87,12 +87,15 @@ static int AddItem(HWND d, int id, const std::wstring& text) {
     return (int)SendDlgItemMessageW(d, id, CB_ADDSTRING, 0, (LPARAM)text.c_str());
 }
 
-// A list of languages; the item data indexes into the vector given.
-static void FillLanguages(HWND d, int id, const std::vector<std::wstring>& langs, const std::wstring& selected) {
+// A list of languages; the item data indexes into the vector given. With a map, a language with no voice chosen says so,
+// as the main language's list does: it follows Windows (commas, as a screen reader may read brackets out).
+static void FillLanguages(HWND d, int id, const std::vector<std::wstring>& langs, const std::wstring& selected, const wv::VoiceMap* map = nullptr) {
     SendDlgItemMessageW(d, id, CB_RESETCONTENT, 0, 0);
     int sel = 0;
     for (size_t i = 0; i < langs.size(); i++) {
-        int item = AddItem(d, id, wv::LanguageName(langs[i]));
+        std::wstring name = wv::LanguageName(langs[i]);
+        if (map && !map->Chosen(langs[i])) name += L", no voice, follows Windows";
+        int item = AddItem(d, id, name);
         SendDlgItemMessageW(d, id, CB_SETITEMDATA, item, (LPARAM)i);
     }
     for (int item = 0, n = (int)SendDlgItemMessageW(d, id, CB_GETCOUNT, 0, 0); item < n; item++)
@@ -275,17 +278,20 @@ static void OnWaitSlider(HWND d, HWND slider) {
 
 static void Fill(HWND d) {
     g_filling = true;
-    // Main language: the languages that have a voice and are not turned off.
+    // Main language: the Voices tab's languages (and the one chosen, if its voices have gone), with a voice or not.
     wv::VoiceMap map;
     map.Build(g_settings, g_voices);
     std::wstring status;
-    if (map.IsFallback())
-        for (const wv::VoiceInfo& v : g_voices)
-            if (v.id == map.VoiceFor(map.MainLanguage())) status = L"No voices chosen yet: " + v.name + L" reads everything. Choose voices on the Voices tab.";
+    for (const wv::VoiceInfo& v : g_voices) {
+        if (v.id != map.VoiceFor(map.MainLanguage())) continue;
+        if (map.IsFallback()) status = L"No voices chosen yet: " + v.name + L" reads everything. Choose voices on the Voices tab.";
+        else if (!map.Chosen(g_settings.mainLanguage)) status = wv::LanguageName(g_settings.mainLanguage) + L" has no voice: " + v.name + L" reads the main language.";
+    }
     SetDlgItemTextW(d, IDC_STATUS, status.c_str());
-    g_mainChoices.assign(map.Languages().begin(), map.Languages().end());
+    g_mainChoices = g_allLanguages;
+    if (std::find(g_mainChoices.begin(), g_mainChoices.end(), g_settings.mainLanguage) == g_mainChoices.end()) g_mainChoices.push_back(g_settings.mainLanguage);
     std::sort(g_mainChoices.begin(), g_mainChoices.end(), [](const std::wstring& a, const std::wstring& b) { return wv::LanguageName(a) < wv::LanguageName(b); });
-    FillLanguages(d, IDC_MAINLANG, g_mainChoices, map.MainLanguage());
+    FillLanguages(d, IDC_MAINLANG, g_mainChoices, g_settings.mainLanguage, &map);
     FillList(d);
     FillVoices(d);
     for (ScriptChoice& sc : g_scripts) {

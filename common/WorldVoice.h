@@ -2,7 +2,8 @@
 // and WorldVoice's language detection (the NVDA add-on's languageDetection, rule for rule).
 //
 // Settings, HKCU\SOFTWARE\WorldVoice:
-//   MainLanguage       the main language, e.g. "en" (its voice reads anything with no script)
+//   MainLanguage       the main language, e.g. "en" (its voice reads anything with no script); with no voice chosen for
+//                      it, Windows' default voice takes its place (see VoiceMap)
 //   LatinLanguage      the language assumed for Latin characters when the text around them is not a Latin language
 //   HanLanguage        the same for CJK characters (Han): "zh", "ja" or "ko"
 //   ArabicLanguage, CyrillicLanguage, DevanagariLanguage   the same for those scripts
@@ -364,37 +365,37 @@ inline std::wstring AutomaticVoice(const std::vector<VoiceInfo>& voices, const s
     return main ? main->id : (first ? first->id : std::wstring());
 }
 
-// Which voice reads each language: only the languages a voice was chosen for (WorldVoice switches to no other).
-// With none chosen yet, one voice reads everything: Windows' default SAPI 5 voice, else an American English
-// voice, else the first one (see AutomaticVoice); IsFallback() then says so.
+// Which voice reads each language: the languages a voice was chosen for (WorldVoice switches to no other), and the
+// main language. A main language with no voice follows Windows (user request, 2026-11-02), whatever language it is:
+// Windows' default SAPI 5 voice, else an American English voice, else the first one (see AutomaticVoice), takes the main
+// language's place, in that language if it speaks it, else in its own. A voice chosen for that language still reads it,
+// so that one sentence is not read by two voices of a language. With no voice chosen at all this voice reads everything;
+// IsFallback() then says so.
 class VoiceMap {
 public:
     void Build(const Settings& s, const std::vector<VoiceInfo>& voices) {
         m_voices.clear();
         m_languages.clear();
-        m_fallback = false;
+        m_main.clear();
         for (const auto& kv : s.voices)
             if (kv.second != kNoVoice && Find(voices, kv.second)) { m_languages.insert(kv.first); m_voices[kv.first] = kv.second; }
-        if (m_languages.empty()) {
-            std::wstring defaultId = ReadString(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Speech\\Voices", L"DefaultTokenId");
-            const VoiceInfo* v = nullptr;
-            for (const VoiceInfo& x : voices) if (_wcsicmp(x.id.c_str(), defaultId.c_str()) == 0) v = &x;
-            if (!v) { std::wstring id = AutomaticVoice(voices, L"en"); for (const VoiceInfo& x : voices) if (x.id == id) v = &x; }
-            if (!v && !voices.empty()) v = &voices[0];
-            if (v && !v->languages.empty()) {
-                m_main = v->languages[0];
-                m_languages.insert(m_main);
-                m_voices[m_main] = v->id;
-                m_fallback = true;
-            }
+        m_chosen = m_languages;
+        m_fallback = m_chosen.empty();
+        std::wstring wanted = PrimaryLanguage(s.mainLanguage);
+        if (m_chosen.count(wanted)) { m_main = wanted; return; }
+        const VoiceInfo* v = WindowsVoice(voices);
+        if (!v || v->languages.empty()) {
+            if (!m_chosen.empty()) m_main = *m_chosen.begin();
             return;
         }
-        m_main = s.mainLanguage;
-        if (!m_languages.count(m_main)) m_main = m_languages.count(L"en") ? L"en" : *m_languages.begin();
+        bool speaksIt = std::find(v->languages.begin(), v->languages.end(), wanted) != v->languages.end();
+        m_main = speaksIt ? wanted : v->languages[0];
+        if (!m_chosen.count(m_main)) { m_languages.insert(m_main); m_voices[m_main] = v->id; }
     }
     bool IsFallback() const { return m_fallback; }
     const std::set<std::wstring>& Languages() const { return m_languages; }      // WorldVoice's availableLanguages
     bool Has(const std::wstring& lang) const { return m_languages.count(PrimaryLanguage(lang)) != 0; }
+    bool Chosen(const std::wstring& lang) const { return m_chosen.count(PrimaryLanguage(lang)) != 0; }   // a voice was chosen for it
     std::wstring VoiceFor(const std::wstring& lang) const {
         auto it = m_voices.find(PrimaryLanguage(lang));
         return it == m_voices.end() ? std::wstring() : it->second;
@@ -406,7 +407,15 @@ private:
         for (const VoiceInfo& v : voices) if (_wcsicmp(v.id.c_str(), id.c_str()) == 0) return true;
         return false;
     }
-    std::set<std::wstring> m_languages;
+    static const VoiceInfo* WindowsVoice(const std::vector<VoiceInfo>& voices) {
+        std::wstring defaultId = ReadString(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Speech\\Voices", L"DefaultTokenId");
+        const VoiceInfo* v = nullptr;
+        for (const VoiceInfo& x : voices) if (_wcsicmp(x.id.c_str(), defaultId.c_str()) == 0) v = &x;
+        if (!v) { std::wstring id = AutomaticVoice(voices, L"en"); for (const VoiceInfo& x : voices) if (x.id == id) v = &x; }
+        if (!v && !voices.empty()) v = &voices[0];
+        return v;
+    }
+    std::set<std::wstring> m_languages, m_chosen;
     std::map<std::wstring, std::wstring> m_voices;
     std::wstring m_main;
     bool m_fallback = false;

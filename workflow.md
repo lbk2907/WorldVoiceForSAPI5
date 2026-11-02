@@ -35,8 +35,8 @@ build it; `setup\README.txt` is the user's guide the setup installs.  These are 
   settings, Chinese as the CJK characters' default language where the add-on has Japanese, the main language as the
   default number language where the add-on has the surrounding text's, the two wait factors in plain
   milliseconds, starting at 0, with no global one, the one sound format at
-  the chosen voices' highest rate, the trimmed silences, each language's rate, pitch and volume, thousands commas
-  kept unless a group size cuts the number, one voice chosen for two languages counting as two, the full stops next
+  the chosen voices' highest rate, a main language with no voice following Windows' default voice, the trimmed
+  silences, each language's rate, pitch and volume, thousands commas kept unless a group size cuts the number, one voice chosen for two languages counting as two, the full stops next
   to numbers left without the add-on's spaces, the symbols in a number left unnamed, the spaces kept where the pauses
   between numbers go in) is described in `README.md` and `setup\README.txt`.  If it was asked for, say so: "(user
   request)".
