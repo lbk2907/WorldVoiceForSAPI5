@@ -114,7 +114,8 @@ Also:
   between them: "12,345", "5-3", "12:30" and "2×3" are one number each. A sign right after a letter or digit stays
   with the word, as the hyphen in "COVID-19"; after a space it belongs to the number, as in "-3". A number goes to
   another voice only where its language has a voice of its own: one read by the same voice as the text before it
-  stays with that text. After a number the detection starts again from the main (or marked) language.
+  stays with that text. One voice chosen for two languages, as Eloquence with its many languages can be, reads each
+  in its own language, so there the number is read in the number language too. After a number the detection starts again from the main (or marked) language.
 - Text the program marks with a language (NVDA's automatic language switching, a `<lang>` tag in SAPI's XML) takes
   that language in place of the main language, and the detection carries on from it. When that language has no
   voice chosen, the main language's voice reads it.

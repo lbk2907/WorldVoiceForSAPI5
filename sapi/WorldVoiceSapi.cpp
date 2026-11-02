@@ -617,7 +617,7 @@ void WorldVoiceEngine::Split(const wv::Detector& detector, const std::wstring& b
         // the language in force again.
         if (!inNumber.empty() && inNumber[f - frags]) {
             std::wstring numberLang = detector.NumberLanguageAt(current);
-            add(detector.SameVoice(numberLang, temporary) ? temporary : numberLang, *f);
+            add(detector.ReadAlike(numberLang, temporary) ? temporary : numberLang, *f);
             temporary = current;
             continue;
         }
@@ -656,7 +656,7 @@ void WorldVoiceEngine::Split(const wv::Detector& detector, const std::wstring& b
         size_t nextNumber = 0;
         for (size_t i = 0; i < f->ulTextLen;) {
             if (nextNumber < numbers.size() && i == numbers[nextNumber].first) {
-                cut(i, detector.SameVoice(numberLang, runLang) ? runLang : numberLang);
+                cut(i, detector.ReadAlike(numberLang, runLang) ? runLang : numberLang);
                 tracked = current;
                 i = numbers[nextNumber++].second;
                 continue;

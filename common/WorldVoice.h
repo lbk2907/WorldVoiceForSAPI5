@@ -472,9 +472,12 @@ public:
         return n == kNumbersMain ? inForce : n;
     }
 
-    // Whether two languages are read by the same voice (a language with no voice is read by the main language's):
-    // the add-on keeps a language switch only where the voice changes (deduplicate_language_command).
-    bool SameVoice(const std::wstring& a, const std::wstring& b) const {
+    // Whether two languages are read alike: the add-on keeps a language switch only where the voice changes
+    // (deduplicate_language_command). A voice can also be chosen for two languages here, as Eloquence, one voice with
+    // many languages, can (user report, 2026-11-02: its numbers stayed in the text's language), and it reads each of
+    // them in that language: those two are not alike. A language with no voice is read by the main language's.
+    bool ReadAlike(const std::wstring& a, const std::wstring& b) const {
+        if (m_map.Has(a) && m_map.Has(b)) return PrimaryLanguage(a) == PrimaryLanguage(b);
         std::wstring va = m_map.VoiceFor(a), vb = m_map.VoiceFor(b), main = m_map.VoiceFor(m_map.MainLanguage());
         if (va.empty()) va = main;
         if (vb.empty()) vb = main;

@@ -305,7 +305,7 @@ private:
         size_t n = t.size();
         std::vector<std::pair<size_t, size_t>> numbers = NumbersForLanguage(t.c_str(), n);
         if (numbers.empty()) { out.push_back(in); return; }
-        bool wrap = !m_numberLanguage.empty() && !m_detector.SameVoice(m_numberLanguage, InForce(in));
+        bool wrap = !m_numberLanguage.empty() && !m_detector.ReadAlike(m_numberLanguage, InForce(in));
         struct Part { bool number; size_t a, b; };
         std::vector<Part> parts;
         size_t pos = 0;
