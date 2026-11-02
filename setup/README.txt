@@ -169,10 +169,15 @@ Voices tab
         Every language an installed voice speaks, with its voice and its rate, pitch and volume adjustments.
     Voice for the selected language
         None (the default: WorldVoice does not switch to that language), or one of the voices that speak it.
-    Rate, Pitch and Volume
-        From -10 to +10; 0 (the default) is as the speaking program asks. Rate and pitch are added to the program's,
-        in SAPI's steps; volume changes by 10% a step, so it can also go above the program's. Each language has its
-        own.
+    Rate and Volume
+        From -10 to +10; 0 (the default) is as the speaking program asks. Rate is added to the program's, in SAPI's
+        steps; volume changes by 10% a step, so it can also go above the program's. Each language has its own.
+    Pitch
+        From 0 to 100, as NVDA's pitch setting (user request): 50 (the default) is as the speaking program asks, 100
+        goes up to the voice's highest pitch and 0 down to its lowest, whatever the voice's own range. It is added to
+        the program's pitch, and stops at the voice's highest and lowest. A voice that follows only part of that scale
+        stays where it is beyond it: Microsoft's David and Zira reach their highest at 70 and their lowest at 30, as
+        they do with NVDA's own pitch setting. Each language has its own.
     Test
         Type a text and press Play to hear it with the selected language's voice and adjustments. With "Test all
         languages together, as WorldVoice reads them" ticked, Play reads it the way WorldVoice does, each language
@@ -254,7 +259,7 @@ HKEY_CURRENT_USER\SOFTWARE\WorldVoice:
         the voice chosen for the language (its SAPI 5 token, such as
         HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0); no value means None
     Adjustments\<language>
-        DWORDs Rate, Pitch and Volume, -10 to 10
+        DWORDs Rate and Volume, -10 to 10, and Pitch, -25 to 25 (the slider's value / 2 - 25)
     NumberMode
         none, value (the default) or number; any other value reads as value
     NumberGroupSize

@@ -769,12 +769,14 @@ STDMETHODIMP WorldVoiceEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX* f
         for (size_t i = 0; i + 1 < p.frags.size(); i++) p.frags[i].pNext = &p.frags[i + 1];
         LANGID langId = LangIdFor(voices, v->id, p.language);
         if (langId) for (SPVTEXTFRAG& f : p.frags) f.State.LangID = langId;
-        // The language's pitch goes on each piece of text (SAPI's -10..10); its rate and volume in the relay.
+        // The language's pitch goes on each piece of text; its rate and volume in the relay. -25..25, as NVDA's SAPI 5
+        // driver sends its pitch (percent / 2 - 25): a voice spans its whole range over that (user request, 2026-11-02:
+        // cut at -10..10 here, a language's pitch stopped well short of its voice's highest and lowest).
         wv::Adjustment adjust = settings.AdjustmentFor(p.language);
         if (adjust.pitch)
             for (SPVTEXTFRAG& f : p.frags) {
                 long m = f.State.PitchAdj.MiddleAdj + adjust.pitch;
-                f.State.PitchAdj.MiddleAdj = m < -10 ? -10 : (m > 10 ? 10 : m);
+                f.State.PitchAdj.MiddleAdj = m < -25 ? -25 : (m > 25 ? 25 : m);
             }
         if (!SameFormat(*in, out))
             Log("voice %s speaks %lu Hz, %u bit, %u channel(s): converted", Utf8(v->id).c_str(), in->nSamplesPerSec, in->wBitsPerSample, in->nChannels);

@@ -74,6 +74,10 @@ static void Save() {
 // An adjustment as shown: "0", "+3", "-2".
 static std::wstring AdjustmentText(int v) { return v > 0 ? L"+" + std::to_wstring(v) : std::to_wstring(v); }
 
+// The pitch as the slider has it: 0 the voice's lowest, 50 its own, 100 its highest, as NVDA's pitch setting (a saved
+// pitch is -25..25, what NVDA's SAPI 5 driver sends, percent / 2 - 25).
+static int PitchPosition(int pitch) { return pitch * 2 + 50; }
+
 static bool HasLanguage(const wv::VoiceInfo& v, const std::wstring& lang) {
     for (const std::wstring& l : v.languages) if (l == lang) return true;
     return false;
@@ -120,7 +124,7 @@ static std::wstring VoiceText(const std::wstring& lang) {
 // One row's voice and adjustment columns.
 static void SetRowText(HWND list, int row, const std::wstring& lang) {
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
-    std::wstring texts[] = { VoiceText(lang), AdjustmentText(a.rate), AdjustmentText(a.pitch), AdjustmentText(a.volume) };
+    std::wstring texts[] = { VoiceText(lang), AdjustmentText(a.rate), std::to_wstring(PitchPosition(a.pitch)), AdjustmentText(a.volume) };
     for (int c = 0; c < 4; c++) ListView_SetItemText(list, row, c + 1, &texts[c][0]);
 }
 
@@ -167,26 +171,30 @@ static void FillVoices(HWND d) {
     SendDlgItemMessageW(d, IDC_VOICE, CB_SETCURSEL, sel, 0);
     // and its adjustments
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
-    struct { int id, valueId, value; } sliders[] = { { IDC_RATE, IDC_RATE_V, a.rate }, { IDC_PITCH, IDC_PITCH_V, a.pitch }, { IDC_VOLUME, IDC_VOLUME_V, a.volume } };
+    struct { int id, valueId, value; } sliders[] = { { IDC_RATE, IDC_RATE_V, a.rate }, { IDC_VOLUME, IDC_VOLUME_V, a.volume } };
     for (auto& s : sliders) {
         SendDlgItemMessageW(d, s.id, TBM_SETPOS, TRUE, s.value);
         SetDlgItemTextW(d, s.valueId, AdjustmentText(s.value).c_str());
     }
+    SendDlgItemMessageW(d, IDC_PITCH, TBM_SETPOS, TRUE, PitchPosition(a.pitch));
+    SetDlgItemTextW(d, IDC_PITCH_V, std::to_wstring(PitchPosition(a.pitch)).c_str());
 }
 
 // A slider moved: the selected language's adjustment, saved, and shown beside the slider and in the list.
 static void OnSlider(HWND d, HWND slider) {
     std::wstring lang = ListLanguage(d);
     if (lang.empty()) return;
-    int value = wv::ClampAdjustment((int)SendMessageW(slider, TBM_GETPOS, 0, 0));
-    wv::Adjustment a = g_settings.AdjustmentFor(lang);
+    int position = (int)SendMessageW(slider, TBM_GETPOS, 0, 0);
     int id = GetDlgCtrlID(slider);
+    int value = id == IDC_PITCH ? wv::ClampPitch((position - 50) / 2) : wv::ClampAdjustment(position);
+    wv::Adjustment a = g_settings.AdjustmentFor(lang);
     int& field = id == IDC_RATE ? a.rate : (id == IDC_PITCH ? a.pitch : a.volume);
     if (field == value) return;
     field = value;
     if (a.None()) g_settings.adjustments.erase(lang); else g_settings.adjustments[lang] = a;
     Save();
-    SetDlgItemTextW(d, id == IDC_RATE ? IDC_RATE_V : (id == IDC_PITCH ? IDC_PITCH_V : IDC_VOLUME_V), AdjustmentText(value).c_str());
+    SetDlgItemTextW(d, id == IDC_RATE ? IDC_RATE_V : (id == IDC_PITCH ? IDC_PITCH_V : IDC_VOLUME_V),
+                    (id == IDC_PITCH ? std::to_wstring(PitchPosition(value)) : AdjustmentText(value)).c_str());
     HWND list = GetDlgItem(d, IDC_LIST);
     SetRowText(list, ListView_GetNextItem(list, -1, LVNI_SELECTED), lang);
 }
@@ -474,11 +482,15 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             col.pszText = const_cast<wchar_t*>(columns[c]);
             ListView_InsertColumn(list, c + 2, &col);
         }
-        for (int id : { IDC_RATE, IDC_PITCH, IDC_VOLUME }) {
+        for (int id : { IDC_RATE, IDC_VOLUME }) {
             SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, -10);
             SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 10);
             SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 2);
         }
+        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETRANGEMIN, FALSE, 0);
+        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETRANGEMAX, TRUE, 100);
+        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETLINESIZE, 0, 2);       // a step of the voice's pitch
+        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETPAGESIZE, 0, 10);
         for (const wchar_t* name : kNumberModeNames) AddItem(d, IDC_NUMMODE, name);
         for (int id : { IDC_NUMWAIT, IDC_PUNCTWAIT }) {
             SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, 0);
