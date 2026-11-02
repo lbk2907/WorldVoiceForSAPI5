@@ -178,6 +178,10 @@ Voices tab
         the program's pitch, and stops at the voice's highest and lowest. A voice that follows only part of that scale
         stays where it is beyond it: Microsoft's David and Zira reach their highest at 70 and their lowest at 30, as
         they do with NVDA's own pitch setting. Each language has its own.
+    Keys on the Rate, Pitch and Volume sliders
+        The arrow keys move by 1, Page Up and Page Down by 5, Home goes to the highest value and End to the lowest
+        (user request). Pitch changes the sound at every second number, because SAPI 5 takes whole steps only; NVDA's
+        own pitch setting does the same.
     Test
         Type a text and press Play to hear it with the selected language's voice and adjustments. With "Test all
         languages together, as WorldVoice reads them" ticked, Play reads it the way WorldVoice does, each language
@@ -259,7 +263,8 @@ HKEY_CURRENT_USER\SOFTWARE\WorldVoice:
         the voice chosen for the language (its SAPI 5 token, such as
         HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0); no value means None
     Adjustments\<language>
-        DWORDs Rate and Volume, -10 to 10, and Pitch, -25 to 25 (the slider's value / 2 - 25)
+        DWORDs Rate and Volume, -10 to 10, and PitchPercent, 0 to 100, 50 as the speaking program asks. A Pitch saved
+        by an older version, in whole steps from -25 to 25, is still read, and replaced at the next save
     NumberMode
         none, value (the default) or number; any other value reads as value
     NumberGroupSize

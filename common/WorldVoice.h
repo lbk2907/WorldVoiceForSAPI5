@@ -13,9 +13,10 @@
 //   Voices\<language>  the voice for that language (a SAPI 5 voice token id); missing = none: WorldVoice does
 //                      not switch to that language. With no voice chosen at all, Windows' default voice reads
 //                      everything (see VoiceMap).
-//   Adjustments\<language>  DWORDs Rate, Volume, each -10..10, and Pitch, -25..25, 0 = as the speaking program asks:
-//                      rate and pitch added to the program's, rate in SAPI's steps, pitch as NVDA's -25..25, over which
-//                      a voice spans its whole range (the slider's 0..100); volume 10% per step
+//   Adjustments\<language>  DWORDs Rate, Volume, each -10..10, 0 = as the speaking program asks, and PitchPercent,
+//                      0..100, 50 = as the speaking program asks: rate and pitch added to the program's, rate in SAPI's
+//                      steps, pitch as NVDA's percent / 2 - 25, over which a voice spans its whole range; volume 10% per
+//                      step. A Pitch found instead is an older save, in whole steps, -25..25
 //   NumberMode         "none", "value" (the default) or "number" (digit by digit): WorldVoice's number mode
 //   NumberGroupSize    DWORD 0..2147483647 (default 0, no groups): cuts numbers into pieces of that many digits, in
 //                      every number mode. Not the old GroupSize, which the settings program saved as 3 for everyone
@@ -195,13 +196,13 @@ inline bool ReadDword(HKEY root, const wchar_t* key, const wchar_t* name, DWORD&
     return true;
 }
 
-// A language's adjustments to the speaking program's rate, pitch and volume; all 0 = none.
+// A language's adjustments to the speaking program's rate, pitch and volume; rate and volume 0, pitch 50 = none.
 struct Adjustment {
-    int rate = 0, pitch = 0, volume = 0;
-    bool None() const { return !rate && !pitch && !volume; }
+    int rate = 0, pitch = 50, volume = 0;
+    bool None() const { return !rate && pitch == 50 && !volume; }
 };
 inline int ClampAdjustment(int v) { return v < -10 ? -10 : (v > 10 ? 10 : v); }
-inline int ClampPitch(int v) { return v < -25 ? -25 : (v > 25 ? 25 : v); }
+inline int ClampPitch(int v) { return v < 0 ? 0 : (v > 100 ? 100 : v); }
 inline int ClampFactor(DWORD v) { return v > 1000 ? 1000 : (int)v; }   // a wait factor: its pause in ms, 0..1000
 
 // The number languages that are not a language (the add-on's numberLanguage.py): numbers read in the language of the
@@ -274,7 +275,8 @@ struct Settings {
                 Adjustment a;
                 DWORD v = 0;
                 if (ReadDword(HKEY_CURRENT_USER, sub.c_str(), L"Rate", v)) a.rate = ClampAdjustment((int)v);
-                if (ReadDword(HKEY_CURRENT_USER, sub.c_str(), L"Pitch", v)) a.pitch = ClampPitch((int)v);
+                if (ReadDword(HKEY_CURRENT_USER, sub.c_str(), L"PitchPercent", v)) a.pitch = ClampPitch((int)v);
+                else if (ReadDword(HKEY_CURRENT_USER, sub.c_str(), L"Pitch", v)) a.pitch = ClampPitch((int)v * 2 + 50);
                 if (ReadDword(HKEY_CURRENT_USER, sub.c_str(), L"Volume", v)) a.volume = ClampAdjustment((int)v);
                 if (!a.None()) adjustments[PrimaryLanguage(name)] = a;
             }

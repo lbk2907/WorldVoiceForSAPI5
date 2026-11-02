@@ -66,17 +66,14 @@ static void Save() {
         if (a.None()) { RegDeleteKeyW(HKEY_CURRENT_USER, sub.c_str()); continue; }
         DWORD rate = (DWORD)a.rate, pitch = (DWORD)a.pitch, volume = (DWORD)a.volume;
         RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Rate", REG_DWORD, &rate, sizeof(rate));
-        RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Pitch", REG_DWORD, &pitch, sizeof(pitch));
+        RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"PitchPercent", REG_DWORD, &pitch, sizeof(pitch));
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Pitch");      // an older save, in whole steps
         RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Volume", REG_DWORD, &volume, sizeof(volume));
     }
 }
 
 // An adjustment as shown: "0", "+3", "-2".
 static std::wstring AdjustmentText(int v) { return v > 0 ? L"+" + std::to_wstring(v) : std::to_wstring(v); }
-
-// The pitch as the slider has it: 0 the voice's lowest, 50 its own, 100 its highest, as NVDA's pitch setting (a saved
-// pitch is -25..25, what NVDA's SAPI 5 driver sends, percent / 2 - 25).
-static int PitchPosition(int pitch) { return pitch * 2 + 50; }
 
 static bool HasLanguage(const wv::VoiceInfo& v, const std::wstring& lang) {
     for (const std::wstring& l : v.languages) if (l == lang) return true;
@@ -124,7 +121,7 @@ static std::wstring VoiceText(const std::wstring& lang) {
 // One row's voice and adjustment columns.
 static void SetRowText(HWND list, int row, const std::wstring& lang) {
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
-    std::wstring texts[] = { VoiceText(lang), AdjustmentText(a.rate), std::to_wstring(PitchPosition(a.pitch)), AdjustmentText(a.volume) };
+    std::wstring texts[] = { VoiceText(lang), AdjustmentText(a.rate), std::to_wstring(a.pitch), AdjustmentText(a.volume) };
     for (int c = 0; c < 4; c++) ListView_SetItemText(list, row, c + 1, &texts[c][0]);
 }
 
@@ -176,8 +173,8 @@ static void FillVoices(HWND d) {
         SendDlgItemMessageW(d, s.id, TBM_SETPOS, TRUE, s.value);
         SetDlgItemTextW(d, s.valueId, AdjustmentText(s.value).c_str());
     }
-    SendDlgItemMessageW(d, IDC_PITCH, TBM_SETPOS, TRUE, PitchPosition(a.pitch));
-    SetDlgItemTextW(d, IDC_PITCH_V, std::to_wstring(PitchPosition(a.pitch)).c_str());
+    SendDlgItemMessageW(d, IDC_PITCH, TBM_SETPOS, TRUE, a.pitch);
+    SetDlgItemTextW(d, IDC_PITCH_V, std::to_wstring(a.pitch).c_str());
 }
 
 // A slider moved: the selected language's adjustment, saved, and shown beside the slider and in the list.
@@ -186,7 +183,7 @@ static void OnSlider(HWND d, HWND slider) {
     if (lang.empty()) return;
     int position = (int)SendMessageW(slider, TBM_GETPOS, 0, 0);
     int id = GetDlgCtrlID(slider);
-    int value = id == IDC_PITCH ? wv::ClampPitch((position - 50) / 2) : wv::ClampAdjustment(position);
+    int value = id == IDC_PITCH ? wv::ClampPitch(position) : wv::ClampAdjustment(position);
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
     int& field = id == IDC_RATE ? a.rate : (id == IDC_PITCH ? a.pitch : a.volume);
     if (field == value) return;
@@ -194,9 +191,16 @@ static void OnSlider(HWND d, HWND slider) {
     if (a.None()) g_settings.adjustments.erase(lang); else g_settings.adjustments[lang] = a;
     Save();
     SetDlgItemTextW(d, id == IDC_RATE ? IDC_RATE_V : (id == IDC_PITCH ? IDC_PITCH_V : IDC_VOLUME_V),
-                    (id == IDC_PITCH ? std::to_wstring(PitchPosition(value)) : AdjustmentText(value)).c_str());
+                    (id == IDC_PITCH ? std::to_wstring(value) : AdjustmentText(value)).c_str());
     HWND list = GetDlgItem(d, IDC_LIST);
     SetRowText(list, ListView_GetNextItem(list, -1, LVNI_SELECTED), lang);
+}
+
+// Home goes to a rate, pitch or volume slider's highest value and End to its lowest (user request, 2026-11-02). A
+// trackbar has them the other way round, TBS_DOWNISLEFT or not, so the two keys are swapped on their way in.
+static LRESULT CALLBACK SliderKeys(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
+    if (msg == WM_KEYDOWN && (wp == VK_HOME || wp == VK_END)) wp = wp == VK_HOME ? VK_END : VK_HOME;
+    return DefSubclassProc(h, msg, wp, lp);
 }
 
 static std::vector<std::wstring> g_mainChoices;
@@ -485,12 +489,14 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         for (int id : { IDC_RATE, IDC_VOLUME }) {
             SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, -10);
             SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 10);
-            SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 2);
         }
         SendDlgItemMessageW(d, IDC_PITCH, TBM_SETRANGEMIN, FALSE, 0);
         SendDlgItemMessageW(d, IDC_PITCH, TBM_SETRANGEMAX, TRUE, 100);
-        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETLINESIZE, 0, 2);       // a step of the voice's pitch
-        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETPAGESIZE, 0, 10);
+        for (int id : { IDC_RATE, IDC_PITCH, IDC_VOLUME }) {
+            SendDlgItemMessageW(d, id, TBM_SETLINESIZE, 0, 1);
+            SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 5);
+            SetWindowSubclass(GetDlgItem(d, id), SliderKeys, 0, 0);
+        }
         for (const wchar_t* name : kNumberModeNames) AddItem(d, IDC_NUMMODE, name);
         for (int id : { IDC_NUMWAIT, IDC_PUNCTWAIT }) {
             SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, 0);
