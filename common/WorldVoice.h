@@ -469,27 +469,34 @@ public:
         return current;
     }
 
-    // _language_for_character. A decimal digit of any script stays in the current run: a number's language is its
-    // number language (NumberLanguageAt).
-    std::wstring LanguageForCharacter(uint32_t cp, const std::wstring& current, const std::wstring& base) const {
-        if (IsDecimal(cp)) return current;
+    // _script_language: the language for a character by its script; the current language for one of no script of its
+    // own (Common, Inherited or unknown).
+    std::wstring ScriptLanguage(uint32_t cp, const std::wstring& current, const std::wstring& base) const {
         const char* script = ScriptOf(cp);
         if (!script || !strcmp(script, "Common") || !strcmp(script, "Inherited")) return current;
         return LanguageForScript(script, current, base);
     }
 
-    // process_for_spelling's choice for one character; base is the language spelling starts in.
+    // _language_for_character (the add-on's 7.1). When numbers follow the text around them, a decimal digit of a
+    // script of its own, a Devanagari or an Arabic-Indic one, goes by the rule of its script's letters, as a voice of
+    // another script may not read it; 0-9 and the full-width digits are Common, and stay in the current run. Every
+    // other number language puts each number in its own language (NumberLanguageAt), and there a digit of any script
+    // stays in the run.
+    std::wstring LanguageForCharacter(uint32_t cp, const std::wstring& current, const std::wstring& base) const {
+        if (IsDecimal(cp) && m_settings.numberLanguage != kNumbersFollow) return current;
+        return ScriptLanguage(cp, current, base);
+    }
+
+    // process_for_spelling's choice for one character; base is the language spelling starts in. A digit is spelled in
+    // the number language (_spelling_language_for_digit), or, when numbers follow the text, as it is read.
     std::wstring LanguageForSpelling(uint32_t cp, const std::wstring& current, const std::wstring& base) const {
         if (IsSpace(cp)) return base;
-        if (IsDecimal(cp)) {                 // _spelling_language_for_digit
-            const std::wstring& n = m_settings.numberLanguage;
-            if (n == kNumbersFollow) return current;
+        const std::wstring& n = m_settings.numberLanguage;
+        if (IsDecimal(cp) && n != kNumbersFollow) {
             if (n != kNumbersMain && m_map.Has(n)) return n;
             return base;
         }
-        const char* script = ScriptOf(cp);
-        if (!script || !strcmp(script, "Common") || !strcmp(script, "Inherited")) return current;
-        return LanguageForScript(script, current, base);
+        return ScriptLanguage(cp, current, base);
     }
 
     // The language a number is read in, where the language in force is inForce (detect_with_number_language, and

@@ -45,6 +45,11 @@ Spaces, punctuation and symbols stay with the text around them.
 Numbers follow the Number language setting. With "Follow main language" (the default here, user request; the add-on's
 default is the other) a number is read in the main language (or the program's marked one). With "Follow surrounding
 text language" it is read in the language of the text around it, and with a language chosen, in that language.
+With "Follow surrounding text language", digits of a script of their own, such as Devanagari "२०८१" and Arabic-Indic
+"١٢٣", go where that script's letters would go when the text around them is not in that script: in "abc ١٢٣" the
+Arabic voice reads "١٢٣", and "२०८१" on its own goes to the Devanagari voice, not the main voice, which may not read
+them (as the add-on does since its version 7.1; before, they stayed with the text around them). The digits 0 to 9 and
+full-width ones always stay with the text around them.
 A number is its digits, of any script (also full-width
 digits such as "１２" and Arabic-Indic ones such as "١٢"), with any punctuation and symbols of Latin-1 between them:
 "12,345", "5-3", "12:30" and "2×3" are one number each. A sign right after a letter or digit stays with the word, as
@@ -57,8 +62,8 @@ Text the program marks with a language (NVDA's automatic language switching, a <
 language in place of the main language, and the detection carries on from it. When that language has no voice
 chosen, the main language's voice reads it.
 Spelled text (character by character) goes the same way, one character at a time; spaces go to the main language (or
-the program's marked one), and digits follow the Number language: the language around them, the main language, or
-the chosen language when it has a voice.
+the program's marked one), and digits follow the Number language: the language around them (a digit of a script of
+its own going where that script's letters go), the main language, or the chosen language when it has a voice.
 Languages that share a script cannot be told apart by it: Latin text in English text stays English, so a French word
 in an English sentence is read by the English voice. Only text in a script of its own, or marked by the program,
 switches.
@@ -322,9 +327,10 @@ Where it comes from
 
 The language detection is a rule-for-rule port of the WorldVoice NVDA add-on's (version 7.0, its languageDetection
 module: find_language_for_script, _language_for_character, add_detected_language_commands and process_for_spelling,
-with the number language of detect_with_number_language), and its table of the script of every character is made
-from that add-on's code. The number mode and the pauses at punctuation are a rule-for-rule port of the same version's
-speech pipeline (remove_thousands_separators, inject_numbers, inject_punctuation_pause and number_wait_factor).
+with the number language of detect_with_number_language, and version 7.1's rule for the digits of a script), and its
+table of the script of every character is made from that add-on's code. The number mode and the pauses at
+punctuation are a rule-for-rule port of version 7.0's speech pipeline (remove_thousands_separators, inject_numbers,
+inject_punctuation_pause and number_wait_factor).
 WorldVoice is by Tseng Woody: https://github.com/tsengwoody/WorldVoice. This voice also has the add-on's name. The
 rest (the SAPI 5 voice, the sound conversion and the configuration program) is written for this voice.
 
