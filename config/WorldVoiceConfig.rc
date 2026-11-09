@@ -63,9 +63,9 @@ BEGIN
     // ---- Voices ----
     LTEXT           "&Languages and their voices:", IDC_LIST_L, 10, 28, 300, 8
     CONTROL         "", IDC_LIST, WC_LISTVIEW, LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 10, 39, 300, 90
-    // The selected language's voice and adjustments: rate and volume -10..10 (0 = as the speaking program asks), pitch
-    // 0..100 (50 = the same). The sliders have TBS_DOWNISLEFT (0x0400, written as a number: rc does not see the
-    // CommCtrl.h define), so Up and Page Up raise the value.
+    // The selected language's voice and adjustments: rate, pitch and volume 0..100 (50 = as the speaking program
+    // asks). The sliders have TBS_DOWNISLEFT (0x0400, written as a number: rc does not see the CommCtrl.h define), so
+    // Up and Page Up raise the value.
     GROUPBOX        "Voice settings", IDC_VOICEGROUP, 6, 134, 308, 78
     LTEXT           "&Voice for the selected language:", IDC_VOICE_L, 12, 148, 120, 8
     COMBOBOX        IDC_VOICE, 134, 146, 172, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP

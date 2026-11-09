@@ -202,8 +202,10 @@ private:
 // ---------------------------------------------------------------------------
 // The site a voice speaks into: its audio goes on to SAPI's site in WorldVoice's format, its events with their
 // audio positions moved onto WorldVoice's stream. Everything else is SAPI's site's answer, except the language's
-// adjustments: the rate is the program's plus the language's rate (SAPI's -10..10), and the volume is scaled by
-// 10% per step of the language's volume (so it can also go above the program's).
+// adjustments: the rate is the program's plus the language's 0..100 as SAPI's steps (percent / 5 - 10, so 50 adds
+// nothing and the sound changes at every fifth number), and the volume is multiplied by the language's percent / 50
+// (0 silent, 100 twice as loud, so it can also go above the program's). A save in the older whole steps, -10..10, is
+// read as 5 per step from 50 (WorldVoice.h), which gives the same rate and volume.
 //
 // Faster language switches: a voice starts and ends what it says with silence, as if the text began and ended
 // there (Tingting ends with 0.6 s of it, Zira with 0.75 s). So the silence at the start of a piece is cut to
@@ -218,7 +220,7 @@ public:
     RelaySite(ISpTTSEngineSite* real, Output& output, ULONGLONG outBase, const WAVEFORMATEX& in, const WAVEFORMATEX& out,
               std::shared_ptr<const wv::ResampleFilter> filter, const wv::Adjustment& adjust)
         : m_real(real), m_output(output), m_base(outBase), m_inFull(&in), m_in(in), m_outFormat(out), m_leadKeep(out.nSamplesPerSec * 20 / 1000),
-          m_rateAdjust(adjust.rate), m_gain(1.0 + adjust.volume / 10.0) {
+          m_rateAdjust(adjust.rate / 5 - 10), m_gain(adjust.volume / 50.0) {
         if (filter) m_resampler.reset(new wv::Resampler(std::move(filter)));
     }
     ~RelaySite() {

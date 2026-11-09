@@ -174,9 +174,14 @@ Voices tab
         Every language an installed voice speaks, with its voice and its rate, pitch and volume adjustments.
     Voice for the selected language
         None (the default: WorldVoice does not switch to that language), or one of the voices that speak it.
-    Rate and Volume
-        From -10 to +10; 0 (the default) is as the speaking program asks. Rate is added to the program's, in SAPI's
-        steps; volume changes by 10% a step, so it can also go above the program's. Each language has its own.
+    Rate
+        From 0 to 100, as Pitch (user request): 50 (the default) is as the speaking program asks. It is added to the
+        program's rate in SAPI's steps, five numbers to a step: 55 is one step faster, 100 ten steps, 0 ten steps
+        slower. Each language has its own.
+    Volume
+        From 0 to 100, as Pitch (user request): 50 (the default) is as the speaking program asks, 0 is silent and 100
+        twice the program's volume, so it can also go above the program's. Each language has its own.
+        A rate or volume set with an older version, from -10 to +10, keeps its sound: +1 shows as 55, -2 as 40.
     Pitch
         From 0 to 100, as NVDA's pitch setting (user request): 50 (the default) is as the speaking program asks, 100
         goes up to the voice's highest pitch and 0 down to its lowest, whatever the voice's own range. It is added to
@@ -185,8 +190,10 @@ Voices tab
         they do with NVDA's own pitch setting. Each language has its own.
     Keys on the Rate, Pitch and Volume sliders
         The arrow keys move by 1, Page Up and Page Down by 5, Home goes to the highest value and End to the lowest
-        (user request). Pitch changes the sound at every second number, because SAPI 5 takes whole steps only; NVDA's
-        own pitch setting does the same.
+        (user request). Pitch changes the sound at every second number and Rate at every fifth, because SAPI 5 takes
+        whole steps only; NVDA's own pitch setting does the same. Volume changes at every number. All three run from 0
+        to 100 because a screen reader is told a slider's place as a percentage of its range: when Rate and Volume ran
+        from -10 to +10, NVDA heard each step as 5.
     Test
         Type a text and press Play to hear it with the selected language's voice and adjustments. With "Test all
         languages together, as WorldVoice reads them" ticked, Play reads it the way WorldVoice does, each language
@@ -268,8 +275,9 @@ HKEY_CURRENT_USER\SOFTWARE\WorldVoice:
         the voice chosen for the language (its SAPI 5 token, such as
         HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0); no value means None
     Adjustments\<language>
-        DWORDs Rate and Volume, -10 to 10, and PitchPercent, 0 to 100, 50 as the speaking program asks. A Pitch saved
-        by an older version, in whole steps from -25 to 25, is still read, and replaced at the next save
+        DWORDs RatePercent, PitchPercent and VolumePercent, 0 to 100, 50 as the speaking program asks. A Rate or
+        Volume (-10 to 10) or Pitch (-25 to 25) saved by an older version, in whole steps, is still read, and replaced
+        at the next save
     NumberMode
         none, value (the default) or number; any other value reads as value
     NumberGroupSize

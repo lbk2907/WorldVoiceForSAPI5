@@ -64,16 +64,15 @@ static void Save() {
         std::wstring sub = std::wstring(wv::kAdjustmentsKey) + L"\\" + lang;
         wv::Adjustment a = g_settings.AdjustmentFor(lang);
         if (a.None()) { RegDeleteKeyW(HKEY_CURRENT_USER, sub.c_str()); continue; }
-        DWORD rate = (DWORD)a.rate, pitch = (DWORD)a.pitch, volume = (DWORD)a.volume;
-        RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Rate", REG_DWORD, &rate, sizeof(rate));
-        RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"PitchPercent", REG_DWORD, &pitch, sizeof(pitch));
-        RegDeleteKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Pitch");      // an older save, in whole steps
-        RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), L"Volume", REG_DWORD, &volume, sizeof(volume));
+        struct { const wchar_t* name; const wchar_t* older; int value; } values[] = {
+            { L"RatePercent", L"Rate", a.rate }, { L"PitchPercent", L"Pitch", a.pitch }, { L"VolumePercent", L"Volume", a.volume } };
+        for (auto& v : values) {
+            DWORD d = (DWORD)v.value;
+            RegSetKeyValueW(HKEY_CURRENT_USER, sub.c_str(), v.name, REG_DWORD, &d, sizeof(d));
+            RegDeleteKeyValueW(HKEY_CURRENT_USER, sub.c_str(), v.older);     // an older save, in whole steps
+        }
     }
 }
-
-// An adjustment as shown: "0", "+3", "-2".
-static std::wstring AdjustmentText(int v) { return v > 0 ? L"+" + std::to_wstring(v) : std::to_wstring(v); }
 
 static bool HasLanguage(const wv::VoiceInfo& v, const std::wstring& lang) {
     for (const std::wstring& l : v.languages) if (l == lang) return true;
@@ -121,7 +120,7 @@ static std::wstring VoiceText(const std::wstring& lang) {
 // One row's voice and adjustment columns.
 static void SetRowText(HWND list, int row, const std::wstring& lang) {
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
-    std::wstring texts[] = { VoiceText(lang), AdjustmentText(a.rate), std::to_wstring(a.pitch), AdjustmentText(a.volume) };
+    std::wstring texts[] = { VoiceText(lang), std::to_wstring(a.rate), std::to_wstring(a.pitch), std::to_wstring(a.volume) };
     for (int c = 0; c < 4; c++) ListView_SetItemText(list, row, c + 1, &texts[c][0]);
 }
 
@@ -168,13 +167,11 @@ static void FillVoices(HWND d) {
     SendDlgItemMessageW(d, IDC_VOICE, CB_SETCURSEL, sel, 0);
     // and its adjustments
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
-    struct { int id, valueId, value; } sliders[] = { { IDC_RATE, IDC_RATE_V, a.rate }, { IDC_VOLUME, IDC_VOLUME_V, a.volume } };
+    struct { int id, valueId, value; } sliders[] = { { IDC_RATE, IDC_RATE_V, a.rate }, { IDC_PITCH, IDC_PITCH_V, a.pitch }, { IDC_VOLUME, IDC_VOLUME_V, a.volume } };
     for (auto& s : sliders) {
         SendDlgItemMessageW(d, s.id, TBM_SETPOS, TRUE, s.value);
-        SetDlgItemTextW(d, s.valueId, AdjustmentText(s.value).c_str());
+        SetDlgItemTextW(d, s.valueId, std::to_wstring(s.value).c_str());
     }
-    SendDlgItemMessageW(d, IDC_PITCH, TBM_SETPOS, TRUE, a.pitch);
-    SetDlgItemTextW(d, IDC_PITCH_V, std::to_wstring(a.pitch).c_str());
 }
 
 // A slider moved: the selected language's adjustment, saved, and shown beside the slider and in the list.
@@ -183,7 +180,7 @@ static void OnSlider(HWND d, HWND slider) {
     if (lang.empty()) return;
     int position = (int)SendMessageW(slider, TBM_GETPOS, 0, 0);
     int id = GetDlgCtrlID(slider);
-    int value = id == IDC_PITCH ? wv::ClampPitch(position) : wv::ClampAdjustment(position);
+    int value = wv::ClampPercent(position);
     wv::Adjustment a = g_settings.AdjustmentFor(lang);
     int& field = id == IDC_RATE ? a.rate : (id == IDC_PITCH ? a.pitch : a.volume);
     if (field == value) return;
@@ -191,7 +188,7 @@ static void OnSlider(HWND d, HWND slider) {
     if (a.None()) g_settings.adjustments.erase(lang); else g_settings.adjustments[lang] = a;
     Save();
     SetDlgItemTextW(d, id == IDC_RATE ? IDC_RATE_V : (id == IDC_PITCH ? IDC_PITCH_V : IDC_VOLUME_V),
-                    (id == IDC_PITCH ? std::to_wstring(value) : AdjustmentText(value)).c_str());
+                    std::to_wstring(value).c_str());
     HWND list = GetDlgItem(d, IDC_LIST);
     SetRowText(list, ListView_GetNextItem(list, -1, LVNI_SELECTED), lang);
 }
@@ -486,13 +483,11 @@ static INT_PTR CALLBACK MainDlg(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             col.pszText = const_cast<wchar_t*>(columns[c]);
             ListView_InsertColumn(list, c + 2, &col);
         }
-        for (int id : { IDC_RATE, IDC_VOLUME }) {
-            SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, -10);
-            SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 10);
-        }
-        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETRANGEMIN, FALSE, 0);
-        SendDlgItemMessageW(d, IDC_PITCH, TBM_SETRANGEMAX, TRUE, 100);
+        // Rate, pitch and volume all run from 0 to 100, as NVDA's own sliders do: a screen reader is told a slider's
+        // place as a percentage of its range, so on a shorter range one step was heard as 5 (user request, 2026-11-09).
         for (int id : { IDC_RATE, IDC_PITCH, IDC_VOLUME }) {
+            SendDlgItemMessageW(d, id, TBM_SETRANGEMIN, FALSE, 0);
+            SendDlgItemMessageW(d, id, TBM_SETRANGEMAX, TRUE, 100);
             SendDlgItemMessageW(d, id, TBM_SETLINESIZE, 0, 1);
             SendDlgItemMessageW(d, id, TBM_SETPAGESIZE, 0, 5);
             SetWindowSubclass(GetDlgItem(d, id), SliderKeys, 0, 0);
